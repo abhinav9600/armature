@@ -1,0 +1,2444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Armature · open-source robot arm studio</title>
+<!--
+  Armature — open-source robot arm studio (MIT License)
+  Blender-style workspace: dockable areas, per-area editor types, workspaces.
+  Simulate any serial-chain arm in 3D, set keyframes, drive real servos/steppers over USB serial,
+  generate firmware for Arduino / ESP / Pico / Raspberry Pi, and export URDF + ROS 2 bridge code.
+  Single self-contained file. Three.js r128 is loaded from cdnjs.
+-->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#c4c4c4;--panel:#e3e3e3;--panel2:#d5d5d5;--field:#f5f5f5;--fieldh:#fff;--line:#a8a8a8;
+  --text:#1e1e1e;--dim:#5c5c5c;--accent:#0e8a83;--accentink:#fff;--accent2:#d9562e;--accent2ink:#fff;--sel:#3d6fb6;--ok:#2b8a3e;--bad:#c9372c;
+  --view:#b8bbc1;--x:#d9412b;--y:#5aa11f;--z:#2f79d1;--tab:#cbcbcb;--keyc:#f2f2f2;--rowa:#e9e9e9;--rowb:#dfdfdf;--pnh:#cfcfcf;
+  color-scheme:light;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#181818;--panel:#2a2a2a;--panel2:#323232;--field:#3b3b3b;--fieldh:#464646;--line:#131313;
+    --text:#d8d8d8;--dim:#909090;--accent:#2dd4c7;--accentink:#07211f;--accent2:#ff7a52;--accent2ink:#2b0d03;--sel:#4b79bd;--ok:#67c27a;--bad:#ea6a5e;
+    --view:#38383d;--x:#e0533f;--y:#7ac043;--z:#3f8fe0;--tab:#222;--keyc:#e8e8e8;--rowa:#2b2b2b;--rowb:#303030;--pnh:#383838;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#181818;--panel:#2a2a2a;--panel2:#323232;--field:#3b3b3b;--fieldh:#464646;--line:#131313;
+  --text:#d8d8d8;--dim:#909090;--accent:#2dd4c7;--accentink:#07211f;--accent2:#ff7a52;--accent2ink:#2b0d03;--sel:#4b79bd;--ok:#67c27a;--bad:#ea6a5e;
+  --view:#38383d;--x:#e0533f;--y:#7ac043;--z:#3f8fe0;--tab:#222;--keyc:#e8e8e8;--rowa:#2b2b2b;--rowb:#303030;--pnh:#383838;
+  color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%;overflow:hidden}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.4 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+.mono,textarea.code,#conOut,#serLog,#conIn{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+#app{display:flex;flex-direction:column;height:100%}
+#areas{flex:1;min-height:0;display:flex;padding:2px;gap:0;background:var(--bg)}
+/* ---------- top bar ---------- */
+#top{display:flex;align-items:center;gap:8px;padding:3px 8px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap;min-height:34px}
+.brand{font-weight:600;font-size:14px;letter-spacing:.2px;margin-right:2px}
+.grow{flex:1}
+#wsTabs{display:flex;gap:2px;background:var(--tab);padding:2px;border-radius:6px}
+#wsTabs button{border:0;background:transparent;padding:2px 11px;border-radius:4px;color:var(--dim)}
+#wsTabs button:hover{background:var(--panel2);color:var(--text)}
+#wsTabs button.on{background:var(--panel);color:var(--text);box-shadow:0 0 0 1px var(--line)}
+.menuwrap{position:relative}
+.menu{position:absolute;top:calc(100% + 3px);left:0;min-width:210px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px;z-index:40;box-shadow:0 6px 18px rgba(0,0,0,.28)}
+.menu button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:5px 9px;border-radius:4px}
+.menu button:hover{background:var(--sel);color:#fff}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+/* ---------- controls ---------- */
+select,input[type=text],input[type=number],input[type=password],textarea{background:var(--field);border:1px solid var(--line);border-radius:4px;padding:3px 6px;min-width:0}
+select:hover,input:hover,textarea:hover{background:var(--fieldh)}
+input[type=number]{width:64px}
+textarea{width:100%;resize:vertical}
+button{background:var(--field);border:1px solid var(--line);border-radius:4px;padding:3px 9px;cursor:pointer}
+button:hover{background:var(--fieldh)}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--accent);color:var(--accentink);border-color:transparent;font-weight:500}
+button.sec{background:var(--accent2);color:var(--accent2ink);border-color:transparent;font-weight:500}
+button.on{background:var(--sel);color:#fff;border-color:transparent}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sw{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.sw input{position:absolute;opacity:0;width:1px;height:1px}
+.sw i{width:30px;height:16px;border-radius:9px;background:var(--field);border:1px solid var(--line);position:relative;transition:background .15s;flex:none}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--dim);transition:transform .15s,background .15s}
+.sw input:checked+i{background:var(--accent)}
+.sw input:checked+i::after{transform:translateX(14px);background:var(--accentink)}
+.sw input:focus-visible+i{outline:2px solid var(--accent);outline-offset:1px}
+#status{display:inline-flex;align-items:center;gap:6px;color:var(--dim)}
+#status b{width:9px;height:9px;border-radius:50%;background:var(--dim);display:inline-block}
+#status.ok b{background:var(--ok)}
+/* ---------- areas ---------- */
+.split{display:flex;flex:1;min-width:0;min-height:0}
+.split.s-row{flex-direction:row}.split.s-col{flex-direction:column}
+.split>.area,.split>.split{flex:1 1 0;min-width:0;min-height:0}
+.gutter{flex:none;background:var(--bg);position:relative;z-index:2}
+.split.s-row>.gutter{width:5px;cursor:col-resize}.split.s-col>.gutter{height:5px;cursor:row-resize}
+.gutter::after{content:"";position:absolute;inset:0;background:var(--accent);opacity:0;transition:opacity .12s}
+.gutter:hover::after,.gutter.drag::after{opacity:.9}
+.area{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.area.flash{outline:2px solid var(--accent);outline-offset:-2px}
+.ah{display:flex;align-items:center;gap:4px;padding:2px 4px;background:var(--panel2);border-bottom:1px solid var(--line);flex:none;height:28px}
+.ah select{padding:1px 4px;font-weight:500;max-width:150px}
+.ah-label{padding:1px 4px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.ah .ttl{flex:1;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ah button{padding:0 6px;height:20px;line-height:1;border-color:transparent;background:transparent;color:var(--dim)}
+.ah button:hover{background:var(--field);color:var(--text)}
+.ab{flex:1;min-height:0;position:relative;overflow:hidden}
+.ed{position:absolute;inset:0}
+.ed.pad{overflow:auto;padding:10px}
+.ed.col{display:flex;flex-direction:column;gap:6px;padding:8px;overflow:hidden}
+#stash{display:none}
+/* ---------- properties panels ---------- */
+details.pn{border:1px solid var(--line);border-radius:4px;margin:0 0 8px;background:var(--panel)}
+details.pn>summary{cursor:pointer;padding:4px 8px;background:var(--pnh);font-weight:600;list-style:none;user-select:none;border-radius:3px}
+details.pn>summary::-webkit-details-marker{display:none}
+details.pn>summary::before{content:"▸";display:inline-block;width:14px;color:var(--dim)}
+details.pn[open]>summary::before{content:"▾"}
+.pnb{padding:8px}
+h3{margin:12px 0 6px;font-size:12px;font-weight:600;color:var(--dim)}
+h3:first-child{margin-top:0}
+.hint{color:var(--dim);font-size:12px;margin:4px 0 8px}
+.row{display:flex;align-items:center;gap:6px;margin:4px 0}
+.row>label{width:92px;flex:none;color:var(--dim)}
+.row input[type=number],.row select,.row input[type=text]{flex:1}
+.row2{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:4px 0}
+.row2 input{width:100%}
+.jr{display:grid;grid-template-columns:8px 1fr 62px 24px;gap:2px 6px;align-items:center;padding:3px 4px;border-radius:4px}
+.jr.sel{background:var(--panel2);outline:1px solid var(--accent)}
+.jr .nm{grid-column:2/4;font-weight:500;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jr .chip{width:6px;height:100%;min-height:30px;border-radius:2px;grid-row:1/3}
+.jr input[type=range]{grid-column:2/3;width:100%;accent-color:var(--accent)}
+.jr input[type=number]{width:100%}
+.jr .kb{grid-row:1/3;grid-column:4;width:24px;height:24px;padding:0;line-height:1}
+.jr .kb.has{color:var(--accent);font-weight:700}
+.lst{border:1px solid var(--line);border-radius:4px;background:var(--field);max-height:220px;overflow:auto}
+.li{display:flex;align-items:center;gap:6px;padding:3px 6px;border-bottom:1px solid var(--line);cursor:pointer}
+.li:last-child{border-bottom:0}.li.sel{background:var(--sel);color:#fff}
+.li .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.li .m{opacity:.7;font-size:11px}
+.li button{padding:0 5px;font-size:11px;color:var(--text)}
+/* ---------- viewport ---------- */
+#viewwrap{background:var(--view);overflow:hidden}
+#gl{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#viewbar{position:absolute;top:8px;left:8px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 16px)}
+#viewbar button{background:color-mix(in srgb,var(--panel) 88%,transparent);padding:2px 8px}
+#viewbar button.on{background:var(--sel);color:#fff}
+#hud{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:8px;align-items:center;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+#hud .nm{font-weight:600;min-width:74px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hud input[type=range]{flex:1;min-width:40px;accent-color:var(--accent)}
+#hud input[type=number]{width:66px}
+#ikinfo{position:absolute;left:10px;bottom:52px;font-size:12px;pointer-events:none;padding:2px 6px;border-radius:4px;background:color-mix(in srgb,var(--panel) 80%,transparent)}
+/* ---------- timeline ---------- */
+#timeline{display:flex;flex-direction:column;background:var(--panel)}
+#tbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 8px;border-bottom:1px solid var(--line);flex:none}
+#tbar input[type=number]{width:52px}
+#tcode{min-width:118px;font-variant-numeric:tabular-nums}
+#dswrap{flex:1;overflow:auto;min-height:0;background:var(--rowa)}
+#ds{display:block;width:100%;touch-action:none}
+/* ---------- console / serial / ai / export ---------- */
+#conOut,#serLog{flex:1 1 auto;min-height:60px;overflow:auto;background:var(--field);border:1px solid var(--line);border-radius:4px;padding:6px;white-space:pre-wrap;word-break:break-word}
+#conOut .in{color:var(--dim)}#conOut .err,#serLog .err{color:var(--bad)}#serLog .tx{color:var(--sel)}#serLog .sys{color:var(--dim);font-style:italic}
+#serLog .rx{color:var(--ok)}
+#conIn{height:74px;flex:none;resize:none}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0}
+.chips button{border-radius:12px;font-size:12px}
+.msg{padding:6px 8px;border-radius:6px;margin:6px 0;white-space:pre-wrap;word-break:break-word}
+.msg.u{background:var(--panel2)}.msg.a{background:var(--field);border:1px solid var(--line)}
+#aiLog{flex:1 1 auto;min-height:60px;overflow:auto}
+#expCode{flex:1 1 auto;min-height:80px;resize:none}
+#fwCode{min-height:280px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td,th{padding:2px 4px;border-bottom:1px solid var(--line);text-align:left;font-weight:400}
+th{color:var(--dim)}
+.warn{color:var(--bad);font-size:12px;margin:2px 0}
+.calrow{display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid var(--line);font-size:12px}
+.calrow:last-child{border-bottom:0}
+.calrow input[type=number]{width:64px}
+.calrow .px{color:var(--dim);width:84px;flex:none;font-family:"IBM Plex Mono",monospace}
+.calrow button{padding:0 6px;font-size:11px}
+/* ---------- status bar ---------- */
+#statusbar{display:flex;gap:16px;align-items:center;padding:2px 10px;background:var(--panel2);border-top:1px solid var(--line);color:var(--dim);font-size:12px;min-height:22px;white-space:nowrap;overflow:hidden}
+#statusbar b{color:var(--text);font-weight:500}
+#toast{position:fixed;left:50%;bottom:calc(34px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:7px 14px;border-radius:6px;opacity:0;pointer-events:none;transition:.18s;z-index:50;max-width:min(90vw,520px)}
+#toast.show{opacity:1;transform:translate(-50%,0)}#toast.bad{background:var(--bad);color:#fff}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;max-width:660px;width:calc(100% - 28px);padding:16px 20px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog h2{margin:0 0 8px;font-size:16px}dialog ol,dialog ul{padding-left:20px;margin:6px 0}dialog li{margin:3px 0}
+kbd{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;background:var(--field);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+/* ---------- onboarding tour ---------- */
+#tourBack{position:fixed;inset:0;z-index:200;background:transparent;opacity:0;transition:opacity .25s}
+#tourBack.show{opacity:1}
+#tourSpot{position:fixed;z-index:201;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.6),0 0 0 3px var(--accent),0 0 22px 2px var(--accent);pointer-events:none;transition:top .32s cubic-bezier(.3,.9,.4,1),left .32s cubic-bezier(.3,.9,.4,1),width .32s cubic-bezier(.3,.9,.4,1),height .32s cubic-bezier(.3,.9,.4,1),opacity .2s;opacity:0}
+#tourSpot.show{opacity:1}
+#tourSpot.center{box-shadow:0 0 0 9999px rgba(0,0,0,.6)}
+@keyframes tourPulse{0%,100%{box-shadow:0 0 0 9999px rgba(0,0,0,.6),0 0 0 3px var(--accent),0 0 18px 1px var(--accent)}50%{box-shadow:0 0 0 9999px rgba(0,0,0,.6),0 0 0 5px var(--accent),0 0 28px 6px var(--accent)}}
+#tourSpot.pulse{animation:tourPulse 1.6s ease-in-out infinite}
+#tourCard{position:fixed;z-index:202;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:16px 18px;width:300px;max-width:calc(100vw - 24px);opacity:0;transform:translateY(6px) scale(.98);transition:top .32s cubic-bezier(.3,.9,.4,1),left .32s cubic-bezier(.3,.9,.4,1),opacity .22s,transform .22s}
+#tourCard.show{opacity:1;transform:translateY(0) scale(1)}
+#tourCard h3{margin:0 0 6px;font-size:15px}
+#tourCard p{margin:0 0 12px;font-size:13px;color:var(--dim);line-height:1.5}
+#tourDots{display:flex;gap:5px;margin-bottom:10px}
+#tourDots span{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background .2s,transform .2s}
+#tourDots span.on{background:var(--accent);transform:scale(1.3)}
+#tourBtns{display:flex;gap:6px;align-items:center}
+#tourBtns .grow{flex:1}
+#tourDemo{height:84px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;background:var(--field);border-radius:8px;overflow:hidden}
+#tourDemo svg{width:100%;height:100%}
+@keyframes tdOrbit{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes tdSlide{0%,100%{transform:translateX(0)}50%{transform:translateX(60px)}}
+@keyframes tdPop{0%,15%{transform:scale(0)}30%,100%{transform:scale(1)}}
+@keyframes tdSweepLine{0%{transform:translateX(0)}45%{transform:translateX(130px)}55%{transform:translateX(130px)}100%{transform:translateX(0)}}
+@keyframes tdCaliper{0%,100%{transform:translateX(0)}50%{transform:translateX(-40px)}}
+@keyframes tdBlink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes tdType{0%,100%{width:0}60%,90%{width:120px}}
+@keyframes tdSweep{0%{transform:translateX(-10px)}100%{transform:translateX(190px)}}
+@keyframes tdTabs{0%,100%{transform:translateX(0)}25%{transform:translateX(48px)}50%{transform:translateX(96px)}75%{transform:translateX(144px)}}
+#tourDemo.big{height:116px}
+@keyframes tdCursor4{
+  0%,6%{transform:translate(36px,18px)}10%{transform:translate(36px,18px) scale(.8)}14%,22%{transform:translate(36px,18px) scale(1)}
+  28%{transform:translate(204px,18px)}32%{transform:translate(204px,18px) scale(.8)}36%,44%{transform:translate(204px,18px) scale(1)}
+  50%{transform:translate(204px,70px)}54%{transform:translate(204px,70px) scale(.8)}58%,66%{transform:translate(204px,70px) scale(1)}
+  72%{transform:translate(36px,70px)}76%{transform:translate(36px,70px) scale(.8)}80%,96%{transform:translate(36px,70px) scale(1)}
+  100%{transform:translate(36px,18px)}
+}
+@keyframes tdCornerPop{0%,8%{opacity:0;transform:scale(0)}14%,100%{opacity:1;transform:scale(1)}}
+@keyframes tdRectDraw{0%,22%{stroke-dashoffset:260}70%,100%{stroke-dashoffset:0}}
+@keyframes tdCheck{0%,78%{opacity:0;transform:scale(.4)}86%,100%{opacity:1;transform:scale(1)}}
+@keyframes tdArmReach{0%,8%{transform:rotate(0deg)}30%,46%{transform:rotate(38deg)}70%,86%{transform:rotate(-18deg)}100%{transform:rotate(0deg)}}
+@keyframes tdGrip{0%,32%{transform:scaleX(1)}40%,74%{transform:scaleX(.35)}84%,100%{transform:scaleX(1)}}
+@keyframes tdObjMove{0%,34%{transform:translate(0,0)}46%,70%{transform:translate(0,-8px)}82%,100%{transform:translate(70px,-8px)}}
+@keyframes tdDropGlow{0%,78%{opacity:.35}88%,100%{opacity:1}}
+@keyframes tdGripL{0%,32%{transform:translateX(0)}40%,74%{transform:translateX(8px)}84%,100%{transform:translateX(0)}}
+@keyframes tdGripR{0%,32%{transform:translateX(0)}40%,74%{transform:translateX(-8px)}84%,100%{transform:translateX(0)}}
+/* ---------- about dialog ---------- */
+#aboutGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}
+#aboutGrid button{text-align:left;padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;gap:2px}
+#aboutGrid button b{font-size:13px}
+#aboutGrid button span{font-size:12px;color:var(--dim);font-weight:400}
+@media (max-width:480px){#aboutGrid{grid-template-columns:1fr}}
+#tourDemo{width:100%;height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;background:var(--field);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+/* ---------- per-panel help popover + animated how-to demos ---------- */
+.ah button.help-btn{font-style:italic;font-weight:700;color:var(--dim)}
+#panelHelp{position:fixed;z-index:120;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.35);padding:14px 16px;width:280px;max-width:calc(100vw - 20px);opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s}
+#panelHelp.show{opacity:1;transform:translateY(0)}
+#panelHelp h4{margin:0 0 8px;font-size:14px}
+#panelHelp p{margin:0;font-size:12.5px;color:var(--dim);line-height:1.5}
+#panelHelp .demo{width:100%;height:58px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;background:var(--field);border:1px solid var(--line);border-radius:7px;overflow:hidden}
+#panelHelp .closeX{position:absolute;top:6px;right:6px;border:0;background:transparent;color:var(--dim);width:22px;height:22px;padding:0;border-radius:4px}
+#panelHelp .closeX:hover{background:var(--fieldh);color:var(--text)}
+.demo-track{width:76%;height:4px;background:var(--line);border-radius:2px;position:relative}
+.demo-thumb{position:absolute;top:50%;left:0;width:13px;height:13px;border-radius:50%;background:var(--accent);transform:translate(-50%,-50%);animation:demoSlide 1.8s ease-in-out infinite}
+@keyframes demoSlide{0%,100%{left:4%}50%{left:96%}}
+.demo-orbit{width:46px;height:46px;border:1.5px dashed var(--line);border-radius:50%;position:relative}
+.demo-orbit .dot{position:absolute;top:-4px;left:50%;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:var(--accent);animation:demoOrbit 2.2s linear infinite;transform-origin:4.5px 27px}
+@keyframes demoOrbit{to{transform:rotate(360deg)}}
+.demo-key{display:flex;align-items:center;gap:14px}
+.demo-key .diamond{width:12px;height:12px;background:var(--accent);transform:rotate(45deg);animation:demoKeyPulse 1.6s ease-in-out infinite}
+.demo-key .play{width:0;height:0;border-style:solid;border-width:7px 0 7px 11px;border-color:transparent transparent transparent var(--accent2);animation:demoKeyPulse 1.6s ease-in-out infinite .4s}
+@keyframes demoKeyPulse{0%,100%{opacity:.35;transform:scale(.8) rotate(45deg)}50%{opacity:1;transform:scale(1.15) rotate(45deg)}}
+.demo-key .play{animation-name:demoPlayPulse}
+@keyframes demoPlayPulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.1)}}
+.demo-type{font-family:"IBM Plex Mono",monospace;font-size:15px;color:var(--accent);position:relative;letter-spacing:1px}
+.demo-type::after{content:'';display:inline-block;width:2px;height:15px;background:var(--accent);margin-left:2px;vertical-align:middle;animation:demoBlink 1s step-end infinite}
+@keyframes demoBlink{50%{opacity:0}}
+.demo-run{width:0;height:0;border-style:solid;border-width:13px 0 13px 21px;border-color:transparent transparent transparent var(--accent);animation:demoRunPulse 1.3s ease-in-out infinite}
+@keyframes demoRunPulse{0%,100%{opacity:.5;filter:drop-shadow(0 0 0 transparent)}50%{opacity:1;filter:drop-shadow(0 0 6px var(--accent))}}
+.demo-plug{display:flex;align-items:center;gap:0}
+.demo-plug .a,.demo-plug .b{width:22px;height:11px;border-radius:3px;background:var(--dim)}
+.demo-plug .a{animation:demoPlugA 1.8s ease-in-out infinite}
+.demo-plug .b{animation:demoPlugB 1.8s ease-in-out infinite}
+@keyframes demoPlugA{0%,15%{transform:translateX(0);background:var(--dim)}50%,100%{transform:translateX(9px);background:var(--ok)}}
+@keyframes demoPlugB{0%,15%{transform:translateX(0);background:var(--dim)}50%,100%{transform:translateX(-9px);background:var(--ok)}}
+.demo-shutter{width:34px;height:34px;border-radius:50%;border:3px solid var(--accent2);position:relative;animation:demoShutter 1.6s ease-in-out infinite}
+.demo-shutter::after{content:'';position:absolute;inset:9px;border:2px solid var(--accent2);border-radius:2px}
+@keyframes demoShutter{0%,100%{transform:scale(.85);opacity:.6}50%{transform:scale(1.05);opacity:1}}
+.demo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.demo-grid span{width:14px;height:14px;border:1.5px solid var(--line);border-radius:3px}
+.demo-grid span:nth-child(2){border-color:var(--accent);animation:demoGridPick 2.4s ease-in-out infinite}
+@keyframes demoGridPick{0%,20%,100%{background:transparent}30%,50%{background:var(--accent);box-shadow:0 0 8px var(--accent)}}
+/* ---------- narrow screens: stack the areas ---------- */
+@media (max-width:900px){
+  html,body{height:auto;overflow:auto}
+  #app{height:auto}
+  #areas{flex:none;display:flex;flex-direction:column;padding:0}
+  .split{display:contents}.gutter{display:none}
+  .area{flex:none!important;margin-bottom:2px}
+  .ab{height:380px;flex:none}
+  .area[data-ed=viewport]{order:0}.area[data-ed=viewport] .ab{height:58vh;min-height:340px}
+  .area[data-ed=timeline]{order:1}.area[data-ed=timeline] .ab{height:300px}
+  .area[data-ed=joints]{order:2}.area[data-ed=props]{order:3}.area[data-ed=script]{order:4}.area[data-ed=ser]{order:5}.area[data-ed=fw]{order:6}.area[data-ed=cam]{order:7}.area[data-ed=calib]{order:8}.area[data-ed=pick]{order:9}
+  .ah button.split-btn{display:none}
+  #statusbar{white-space:normal;flex-wrap:wrap;gap:4px 12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+<header id="top">
+  <span class="brand">Armature</span>
+  <div class="menuwrap"><button id="btnFile" aria-haspopup="true" aria-expanded="false">File ▾</button>
+    <div class="menu" id="fileMenu" hidden>
+      <button data-fm="save">Save project…</button><button data-fm="load">Load project…</button><hr>
+      <button data-fm="reset">Reset this workspace layout</button><button data-fm="guide">Quick guide</button><button data-fm="tour">Take the tour</button><button data-fm="about">About Armature</button><button data-fm="about">About Armature</button>
+    </div></div>
+  <nav id="wsTabs" aria-label="Workspaces"></nav>
+  <span class="grow"></span>
+  <select id="preset" aria-label="Arm type"></select>
+  <label class="sw" title="When on, every pose change in the viewport, sliders, IK or timeline is streamed to the connected arm. Turns off on connect for safety."><input type="checkbox" id="mirror"><i></i>Mirror to arm</label>
+  <button id="btnSendNow" title="Send the current pose once">Send pose</button>
+  <span id="status"><b></b><span id="statusTxt">Not connected</span></span>
+  <button id="btnConnect" class="pri">Connect</button>
+  <button id="btnHelp" aria-label="Quick guide">?</button>
+</header>
+
+<main id="areas"></main>
+
+<footer id="statusbar"><span>Tool tip <b class="mono" id="sbTool"></b></span><span id="sbSel"></span><span class="grow"></span><span id="sbHint">Drag the orange target for IK · <kbd>K</kbd> key · <kbd>Space</kbd> play · split areas with ↔ ↕ in any header</span></footer>
+</div>
+
+<div id="stash">
+  <!-- ===== 3D viewport ===== -->
+  <div class="ed" id="viewwrap">
+    <canvas id="gl" aria-label="3D view of the robot arm"></canvas>
+    <div id="viewbar"><button data-view="persp">Perspective</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Right</button><button id="btnTrail">Trail</button><button id="btnGrid" class="on">Grid</button></div>
+    <div id="ikinfo" hidden></div>
+    <div id="hud"><span class="nm" id="hudName"></span><input type="range" id="hudSlider" aria-label="Selected joint"><input type="number" id="hudNum" step="0.1" aria-label="Selected joint value"><button id="hudKey" title="Set a key on this axis (Shift+K)">◆ Key</button><button id="hudSend" title="Send only this axis to the arm">→ Arm</button></div>
+  </div>
+
+  <!-- ===== timeline ===== -->
+  <div class="ed" id="timeline">
+    <div id="tbar">
+      <button id="tStart" aria-label="Jump to start">⏮</button><button id="tPlay" class="pri" style="min-width:34px" aria-label="Play or pause">▶</button><button id="tEnd" aria-label="Jump to end">⏭</button>
+      <span id="tcode" class="mono">0.00 s · f0</span>
+      <label class="row" style="margin:0"><span style="color:var(--dim)">Length</span><input type="number" id="tLen" min="0.5" max="120" step="0.5" value="5"><span style="color:var(--dim)">s</span></label>
+      <select id="tInterp" aria-label="Interpolation"><option value="smooth">Smooth</option><option value="linear">Linear</option><option value="step">Step</option></select>
+      <select id="tSpeed" aria-label="Speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+      <label class="sw"><input type="checkbox" id="tLoop" checked><i></i>Loop</label>
+      <span class="grow"></span>
+      <button id="tKeySel">◆ Key axis</button><button id="tKeyAll" class="pri">◆ Key all (K)</button><button id="tDel">Delete key</button><button id="tClear">Clear keys</button>
+    </div>
+    <div id="dswrap"><canvas id="ds"></canvas></div>
+  </div>
+
+  <!-- ===== joints (pose sliders) ===== -->
+  <div class="ed pad" id="ed-joints">
+    <div class="row"><button id="btnHome">Home pose</button><button id="btnZero">Zero pose</button></div>
+    <div id="poseList"></div>
+    <p class="hint">Click a joint here or in the 3D view to select it. <kbd>◆</kbd> sets a key on that axis.</p>
+  </div>
+
+  <!-- ===== properties (collapsible panels) ===== -->
+  <div class="ed pad" id="ed-props">
+    <details class="pn" open><summary>Arm</summary><div class="pnb">
+      <div class="row"><label>Name</label><input type="text" id="armName"></div>
+      <h3>Joints, base to tip</h3>
+      <div class="lst" id="jlist"></div>
+      <div class="row"><button id="addJoint">Add joint after selected</button></div>
+      <h3>Tool tip</h3>
+      <p class="hint" style="margin-top:0">Measure this with a ruler: the straight-line distance from the last joint to the point that actually grabs or touches things (the tool tip is what inverse kinematics moves).</p>
+      <div id="toolForm"></div>
+      <p class="hint" id="armReach" style="font-weight:500;color:var(--text)"></p>
+    </div></details>
+    <details class="pn" open><summary>Selected joint and motor</summary><div class="pnb"><div id="jform"></div></div></details>
+    <details class="pn" open><summary>Inverse kinematics</summary><div class="pnb">
+      <p class="hint" id="ikReach" style="margin-top:0"></p>
+      <h3>Target (cm)</h3>
+      <div class="row2"><input type="number" id="tgX" step="0.5" aria-label="Target X"><input type="number" id="tgY" step="0.5" aria-label="Target Y"><input type="number" id="tgZ" step="0.5" aria-label="Target Z"></div>
+      <div class="row"><button id="ikSolve" class="pri">Solve</button><button id="ikSnap">Snap target to tool</button></div>
+      <label class="sw"><input type="checkbox" id="ikLive" checked><i></i>Solve while dragging the target</label><br>
+      <label class="sw" style="margin-top:6px"><input type="checkbox" id="ikOrient"><i></i>Hold tool orientation (6D)</label>
+      <h3>Solver settings</h3>
+      <div class="row"><label>Damping λ</label><input type="range" id="ikDamp" min="0.05" max="10" step="0.05" value="1.5"><output id="ikDampV" style="width:34px">1.5</output></div>
+      <div class="row"><label>Step size</label><input type="range" id="ikStep" min="0.1" max="1" step="0.05" value="0.8"><output id="ikStepV" style="width:34px">0.8</output></div>
+      <div class="row"><label>Max iterations</label><input type="number" id="ikIter" min="1" max="500" value="80"></div>
+      <div class="row"><label>Tolerance (mm)</label><input type="number" id="ikTol" min="0.01" max="20" step="0.05" value="0.5"></div>
+      <div class="row"><label>Orient. weight</label><input type="range" id="ikOW" min="0.1" max="10" step="0.1" value="3"><output id="ikOWV" style="width:34px">3</output></div>
+      <label class="sw"><input type="checkbox" id="ikLimits" checked><i></i>Respect joint limits</label>
+      <div class="chips"><button data-ikp="fast">Fast</button><button data-ikp="smooth">Smooth</button><button data-ikp="precise">Precise</button></div>
+      <h3>Joints used by IK</h3>
+      <div id="ikJoints"></div>
+      <p class="hint">Un-tick joints IK should leave alone, for example a wrist you position by hand. The solver is damped least squares, so it also handles redundant arms and stays stable near singularities.</p>
+      <p id="ikOut" class="mono"></p>
+    </div></details>
+  </div>
+
+  <!-- ===== python script mode ===== -->
+  <div class="ed" id="ed-script" style="display:flex">
+    <div style="width:172px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0">
+      <div class="row" style="margin:6px"><button id="scrNew" class="pri" style="flex:1">New script</button></div>
+      <div class="lst" id="scrList" style="flex:1;margin:0 6px 6px;max-height:none;overflow:auto"></div>
+      <div class="row" style="margin:6px"><select id="conEx" aria-label="Load example" style="flex:1"><option value="">Load example…</option></select></div>
+    </div>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px;overflow:hidden">
+      <div class="row" style="margin:0"><input type="text" id="scrName" style="flex:1;font-weight:600" aria-label="Script name" placeholder="Script name"><button id="scrDel" title="Delete this script">Delete</button></div>
+      <textarea id="scrCode" class="code" spellcheck="false" style="flex:1 1 auto;min-height:90px;resize:none" placeholder="# Python-style script&#10;for i in range(3):&#10;    glide(2, 30, 0.5)"></textarea>
+      <div id="conOut" aria-live="polite" style="flex:0 0 auto;max-height:180px"></div>
+      <div class="row" style="margin:0"><button id="conRun" class="pri">Run</button><button id="conStop">Stop</button><button id="conClear">Clear output</button><span class="grow"></span><button id="scrHelp">help()</button></div>
+    </div>
+  </div>
+
+  <!-- ===== firmware ===== -->
+  <div class="ed pad" id="ed-fw">
+    <div class="row"><label>Board</label><select id="fwBoard"></select></div>
+    <div class="row" id="fwIfaceRow"><label>Link</label><select id="fwIface"><option value="usb">USB serial</option><option value="ws">Wi-Fi WebSocket (port 81)</option></select></div>
+    <div id="fwWifi" hidden><div class="row"><label>Wi-Fi name</label><input type="text" id="fwSsid" autocomplete="off"></div><div class="row"><label>Password</label><input type="password" id="fwPass" autocomplete="off"></div></div>
+    <p class="hint" id="fwNotes"></p>
+    <h3>Wiring (edit motors in Properties)</h3>
+    <div id="fwWiring"></div>
+    <div id="fwWarn"></div>
+    <h3>Generated code</h3>
+    <textarea id="fwCode" class="code" rows="16" spellcheck="false"></textarea>
+    <div class="row"><button id="fwCopy" class="pri">Copy</button><button id="fwSave">Save as .txt</button></div>
+    <p class="hint">Power servos and steppers from their own supply (share ground with the board) and start with slow speeds; a mirrored arm moves as soon as commands arrive.</p>
+  </div>
+
+  <!-- ===== camera node (object tracking) ===== -->
+  <div class="ed pad" id="ed-cam">
+    <div class="row">
+      <select id="camDevice" aria-label="Camera" style="flex:1"><option value="">Default camera…</option></select>
+      <button id="camStart" class="pri">Start camera</button>
+    </div>
+    <div class="row"><label>Filters</label><label class="sw" style="margin-right:14px"><input type="checkbox" id="camFlipH"><i></i>Flip horizontal</label><label class="sw"><input type="checkbox" id="camFlipV"><i></i>Flip vertical</label></div>
+    <p class="hint" style="margin:0 0 6px">If moving an object right makes it track left (or up/down is reversed), turn on the matching flip — it mirrors the preview and keeps tracking, calibration and picking consistent with what you see.</p>
+    <div id="camViewWrap" style="position:relative;background:#000;border-radius:5px;overflow:hidden;margin:2px 0 10px;max-height:38vh;display:flex;align-items:stretch">
+      <video id="camVideo" playsinline muted style="display:none"></video>
+      <div style="position:relative;flex:none;display:flex;align-items:center">
+        <canvas id="camView" style="display:block;cursor:crosshair"></canvas>
+        <div id="camOverlay" style="position:absolute;left:6px;top:6px;font:11px/1.3 'IBM Plex Mono',monospace;color:#fff;text-shadow:0 0 3px #000;pointer-events:none"></div>
+      </div>
+      <div id="camMiniWrap" style="flex:1 1 0;min-width:90px;position:relative;border-left:1px solid #222" hidden>
+        <canvas id="camMiniView" style="width:100%;height:100%;display:block"></canvas>
+        <div style="position:absolute;left:6px;bottom:4px;font:10px/1.3 'IBM Plex Mono',monospace;color:#9aa;text-shadow:0 0 3px #000;pointer-events:none">live view</div>
+      </div>
+    </div>
+    <h3>Tracking method</h3>
+    <div class="row"><label>Method</label><select id="camMode"><option value="color">Colour blob (click to pick colour)</option><option value="motion">Motion (frame difference)</option><option value="ml">Object detection (free AI model)</option></select></div>
+    <div class="row" id="camColorRow"><label>Colour</label><span id="camSwatch" style="width:22px;height:22px;border:1px solid var(--line);border-radius:4px;flex:none"></span><label style="width:auto">Tolerance</label><input type="range" id="camTol" min="5" max="90" value="28" style="flex:1"></div>
+    <div class="row" id="camMotionRow" hidden><label>Sensitivity</label><input type="range" id="camSens" min="5" max="80" value="25" style="flex:1"><button id="camBg">Reset background</button></div>
+    <div class="row" id="camMlRow" hidden><label>Track class</label><select id="camClassSel" aria-label="Object class"><option value="any">Any object</option></select></div>
+    <p class="hint" id="camMlStatus" style="margin:0 0 8px"></p>
+    <div class="row"><label>Min size</label><input type="range" id="camMin" min="0.2" max="15" step="0.1" value="1.5" style="flex:1"></div>
+    <p class="hint">Colour and Motion run entirely on your device — no download, no network. Object detection loads a free model (COCO-SSD) from a CDN the first time, then also runs on-device.</p>
+  </div>
+
+  <!-- ===== camera calibration ===== -->
+  <div class="ed pad" id="ed-calib">
+    <h3 style="margin-top:0">Workspace calibration</h3>
+    <ol class="hint" style="margin:0 0 10px;padding-left:18px">
+      <li>Start the camera, looking down at your work surface.</li>
+      <li>Turn on "Add points by clicking", then click 4 corners of a rectangle on that surface: near-left → near-right → far-right → far-left.</li>
+      <li>Type that rectangle's width &amp; height in cm and press "Fill from rectangle" (or type each point's X/Y by hand for an odd-shaped area).</li>
+      <li>Press "Compute calibration".</li>
+    </ol>
+    <div id="calList"></div>
+    <label class="sw" style="display:flex;margin:2px 0 8px"><input type="checkbox" id="calAddMode"><i></i>Add points by clicking the video</label>
+    <div class="row"><input type="number" id="calRectW" step="0.5" placeholder="Width" style="flex:1" aria-label="Rectangle width cm"><input type="number" id="calRectH" step="0.5" placeholder="Height" style="flex:1" aria-label="Rectangle height cm"><span style="color:var(--dim)">cm</span><button id="calRectFill">Fill from rectangle</button></div>
+    <div class="row"><button id="calClear">Clear points</button><button id="calCompute" class="pri">Compute calibration</button></div>
+    <p id="calStatus" class="hint" style="margin:2px 0 10px"></p>
+    <div class="row"><label>Pick height</label><input type="number" id="camZ" step="0.5" value="4"><span style="color:var(--dim)">cm — Z for tracking &amp; pick</span></div>
+    <div class="row"><label>Approach +</label><input type="number" id="camApproach" step="0.5" value="8"><span style="color:var(--dim)">cm above pick height</span></div>
+  </div>
+
+  <!-- ===== pick and place ===== -->
+  <div class="ed pad" id="ed-pick">
+    <h3 style="margin-top:0">Pick and place</h3>
+    <div class="row"><button id="camAutoPick" class="pri" style="flex:1">▶ Start: auto-pick on sight</button></div>
+    <p class="hint" style="margin:4px 0 10px">Starts the camera if needed, shows the tracked object's position in the simulation as soon as it's seen, and runs the full pick sequence on its own — click again to stop.</p>
+    <label class="sw" style="display:flex;margin:2px 0 8px"><input type="checkbox" id="camLive"><i></i>Track live, don't pick (arm just follows the object)</label>
+    <div class="row"><button id="camPick">Pick once</button><button id="camStop">Stop</button></div>
+    <div class="row"><label>Drop at</label><input type="number" id="dropX" step="0.5" placeholder="X"><input type="number" id="dropY" step="0.5" placeholder="Y"><input type="number" id="dropZ" step="0.5" placeholder="Z"></div>
+    <p class="hint">Needs a calibrated workspace and a gripper joint (Properties → set a joint's type to Gripper). Without a drop point the arm just lifts and holds.</p>
+    <h3>Pick history</h3>
+    <div class="lst" id="pickLog" style="max-height:110px"></div>
+    <div class="row"><button id="pickLogClear">Clear history</button></div>
+  </div>
+
+  <!-- ===== serial ===== -->
+  <div class="ed col" id="ed-ser">
+    <div class="row" style="margin:0"><label>Connection</label><select id="trKind"><option value="serial">USB serial (Web Serial)</option><option value="ws">Wi-Fi WebSocket</option><option value="sim">Virtual board (no hardware)</option></select></div>
+    <div class="row" id="trBaudRow" style="margin:0"><label>Baud rate</label><select id="baud"><option>9600</option><option>57600</option><option selected>115200</option><option>250000</option><option>460800</option><option>921600</option></select></div>
+    <div class="row" id="trUrlRow" hidden style="margin:0"><label>Address</label><input type="text" id="wsUrl" value="ws://192.168.1.50:81"></div>
+    <div class="row" style="margin:0"><button id="serConnect" class="pri">Connect</button><button id="btnRead">Read from arm</button><button id="serSend2">Send pose</button></div>
+    <label class="sw"><input type="checkbox" id="keySend" checked><i></i>Move that axis on the real arm when I set a key</label>
+    <div id="serLog" class="mono"></div>
+    <div class="row" style="margin:0"><input type="text" id="serIn" class="mono" placeholder="A 0,35,-70,0,35,0" autocomplete="off" spellcheck="false"><button id="serSend">Send</button><button id="serClear">Clear</button></div>
+    <p class="hint" style="margin:0">Commands: <span class="mono">A v0,v1,…</span> all · <span class="mono">J i v</span> one joint · <span class="mono">R</span> read · <span class="mono">?</span> handshake. Web Serial needs Chrome or Edge on desktop.</p>
+  </div>
+
+</div>
+<input type="file" id="expFile" accept=".json,application/json" hidden>
+
+<dialog id="dlgHelp">
+  <h2>Quick guide</h2>
+  <ol>
+    <li>Pick an arm in the top bar or design your own in <b>Properties → Arm</b>.</li>
+    <li>Drag the target in the 3D view (or its coloured arrows) to solve IK, or move a joint with its slider. Click any joint in the view to select it.</li>
+    <li>Press <kbd>K</kbd> to set keys, move the playhead, pose again, press <kbd>K</kbd>. <kbd>Space</kbd> plays.</li>
+    <li>Use the <b>Serial</b> area to connect a board, then switch on <b>Mirror to arm</b>. Keys and playback move the real axes.</li>
+    <li>Open the <b>Vision</b> workspace for the <b>Camera</b>, <b>Calibration</b> and <b>Pick & Place</b> windows — track an object, calibrate, and have the arm pick it up.</li>
+  </ol>
+  <p><b>Workspace:</b> every area has an editor-type menu in its header. <b>↔</b> splits an area side by side, <b>↕</b> stacks it, <b>✕</b> closes it, and dragging the border between areas resizes them. Workspaces (Layout, Animation, Hardware, Scripting, Vision) remember their own arrangement; File → Reset restores the default.</p>
+  <p><b>Python Script:</b> write or load a script on the left, then Run it. Scripts are saved with your project. <span class="mono">help()</span> in the output lists the commands (glide, goto, key, send, see/track/pick for the camera, and so on).</p>
+  <p><b>Shortcuts:</b> <kbd>K</kbd> key all · <kbd>Shift</kbd>+<kbd>K</kbd> key selected · <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> step a frame · <kbd>Delete</kbd> remove selected keys · mouse: drag to orbit, right-drag or <kbd>Shift</kbd>+drag to pan, wheel to zoom.</p>
+  <p class="hint">Works in this build: serial-chain arms (articulated, SCARA, Cartesian, cylindrical, spherical, snake) and any custom chain, with servos, steppers and PCA9685 drivers. Parallel arms such as delta robots are not modelled yet. Your project and layout autosave in this browser.</p>
+  <form method="dialog"><button class="pri">Close</button></form>
+</dialog>
+<dialog id="dlgAbout">
+  <h2>About Armature</h2>
+  <p>Armature is a free, open-source robot arm studio: simulate any arm, animate it with keyframes, wire up real motors, track objects with a camera, and drive it all from this one page — no install, MIT-licensed, a single HTML file.</p>
+  <p class="hint" style="margin:0">Click any tool below for a quick, animated walkthrough of that window.</p>
+  <div id="aboutGrid"></div>
+  <form method="dialog"><button class="pri">Close</button></form>
+</dialog>
+<div id="toast" role="status"></div>
+<div id="tourBack" hidden></div>
+<div id="tourSpot" hidden></div>
+<div id="tourCard" role="dialog" aria-label="Guided tour" hidden>
+  <div id="tourDots"></div>
+  <div id="tourDemo" hidden></div>
+  <h3 id="tourTitle"></h3>
+  <p id="tourBody"></p>
+  <div id="tourBtns">
+    <button id="tourSkip">Skip tour</button>
+    <span class="grow"></span>
+    <button id="tourBack2">Back</button>
+    <button id="tourNext" class="pri">Next</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script>
+(()=>{
+'use strict';
+/* ================= utilities ================= */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const DEG=Math.PI/180, RAD=180/Math.PI;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const num=(v,d=0)=>{const n=parseFloat(v);return Number.isFinite(n)?n:d;};
+const f2=v=>(+v).toFixed(2);
+function h(tag,attrs,...kids){
+  const e=document.createElement(tag);
+  if(attrs)for(const k in attrs){const v=attrs[k];
+    if(k==='class')e.className=v;else if(k==='text')e.textContent=v;
+    else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);
+    else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v);}
+  kids.flat().forEach(c=>{if(c!=null)e.append(c.nodeType?c:document.createTextNode(c));});
+  return e;
+}
+let toastT=0;
+function toast(msg,bad){const t=$('#toast');t.textContent=msg;t.className='show'+(bad?' bad':'');clearTimeout(toastT);toastT=setTimeout(()=>{t.className='';},bad?5500:2400);}
+const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+async function saveFile(name,text){
+  try{const d=await claude.use('downloads');if(!d){toast('Saving files is not available here. Use Copy instead.',true);return;}
+    await d.save({filename:name,data:text});toast('Saved '+name);}
+  catch(e){if(e&&e.code!=='declined')toast('Could not save: '+(e.message||e.code||e),true);}
+}
+async function copyText(text){
+  try{await navigator.clipboard.writeText(text);toast('Copied');}
+  catch(e){const ta=h('textarea');ta.value=text;document.body.append(ta);ta.select();try{document.execCommand('copy');toast('Copied');}catch(_){toast('Copy failed — select the text and copy manually.',true);}ta.remove();}
+}
+
+/* ================= arm model & presets ================= */
+let pinCtr=2;
+const servoM=(pin)=>({type:'servo',a:pin!=null?pin:pinCtr++,b:-1,en:-1,scale:1,center:90,inv:false,speed:90,accel:300});
+const stepM=(scale,speed,accel)=>{const a=pinCtr;pinCtr+=3;return {type:'stepper',a,b:a+1,en:a+2,scale,center:90,inv:false,speed,accel};};
+const STEP_DEG=200*16/360;
+function J(name,type,axis,off,min,max,home,motor){return {name,type,axis,off,min,max,home,ik:type!=='gripper',motor:motor||servoM()};}
+const PRESETS={
+  art6:{label:'6-DOF articulated arm',build:()=>({name:'6-DOF articulated',tool:[0,0,6],joints:[
+    J('Base','revolute','z',[0,0,4],-90,90,0),J('Shoulder','revolute','y',[0,0,6],-80,80,35),J('Elbow','revolute','y',[0,0,18],-90,90,-70),
+    J('Wrist roll','revolute','z',[0,0,16],-90,90,0),J('Wrist pitch','revolute','y',[0,0,5],-90,90,35),J('Tool roll','revolute','z',[0,0,4],-90,90,0)]})},
+  art5:{label:'5-DOF desk arm + gripper',build:()=>({name:'5-DOF desk arm',tool:[0,0,6],joints:[
+    J('Base','revolute','z',[0,0,4],-90,90,0),J('Shoulder','revolute','y',[0,0,5],-80,80,40),J('Elbow','revolute','y',[0,0,12],-90,90,-80),
+    J('Wrist pitch','revolute','y',[0,0,12],-90,90,40),J('Wrist roll','revolute','z',[0,0,4],-90,90,0),J('Gripper','gripper','y',[0,0,3],0,100,60)]})},
+  art4:{label:'4-DOF arm (MeArm / uArm style)',build:()=>({name:'4-DOF arm',tool:[0,0,5],joints:[
+    J('Base','revolute','z',[0,0,4],-90,90,0),J('Shoulder','revolute','y',[0,0,5],-80,80,35),J('Elbow','revolute','y',[0,0,12],-90,90,-70),
+    J('Wrist pitch','revolute','y',[0,0,12],-90,90,35),J('Gripper','gripper','y',[0,0,3],0,100,60)]})},
+  art3:{label:'3-DOF arm',build:()=>({name:'3-DOF arm',tool:[0,0,5],joints:[
+    J('Base','revolute','z',[0,0,4],-90,90,0),J('Shoulder','revolute','y',[0,0,5],-80,80,35),J('Elbow','revolute','y',[0,0,14],-90,90,-70)]})},
+  scara:{label:'SCARA (horizontal)',build:()=>({name:'SCARA',tool:[0,0,-6],joints:[
+    J('Joint 1','revolute','z',[0,0,14],-90,90,0),J('Joint 2','revolute','z',[16,0,0],-90,90,60),
+    J('Quill Z','prismatic','z',[14,0,0],-12,0,-4,stepM(800,3,30)),J('Tool roll','revolute','z',[0,0,0],-90,90,0)]})},
+  cart:{label:'Cartesian / gantry (XYZ)',build:()=>({name:'Cartesian gantry',tool:[0,0,-4],joints:[
+    J('X axis','prismatic','x',[0,0,0],0,30,15,stepM(800,4,40)),J('Y axis','prismatic','y',[0,0,0],-15,15,0,stepM(800,4,40)),
+    J('Z axis','prismatic','z',[0,0,24],-20,0,-8,stepM(800,4,40))]})},
+  cyl:{label:'Cylindrical',build:()=>({name:'Cylindrical',tool:[3,0,0],joints:[
+    J('Rotate','revolute','z',[0,0,4],-90,90,0),J('Lift','prismatic','z',[0,0,4],0,22,8,stepM(800,4,40)),J('Reach','prismatic','x',[0,0,0],0,20,10,stepM(800,4,40))]})},
+  sph:{label:'Spherical / polar',build:()=>({name:'Spherical',tool:[0,0,4],joints:[
+    J('Yaw','revolute','z',[0,0,6],-90,90,0),J('Pitch','revolute','y',[0,0,4],-80,80,30),J('Extend','prismatic','z',[0,0,6],0,20,8,stepM(800,4,40))]})},
+  snake:{label:'Snake / redundant (8 joints)',build:()=>({name:'Snake arm',tool:[0,0,7],joints:Array.from({length:8},(_,i)=>
+    J('Segment '+(i+1),'revolute',i%2?'x':'y',[0,0,i?7:4],-70,70,i%2?-8:12))})},
+  custom:{label:'Custom (start from 3 joints)',build:()=>({name:'My custom arm',tool:[0,0,6],joints:[
+    J('Base','revolute','z',[0,0,5],-90,90,0),J('Joint 2','revolute','y',[0,0,10],-90,90,20),J('Joint 3','revolute','y',[0,0,10],-90,90,-30)]})}
+};
+function buildPreset(id){pinCtr=2;return PRESETS[id].build();}
+
+/* ================= state ================= */
+let arm=null,q=[],keys=[],sel=0,presetId='art6';
+const tl={len:5,t:0,playing:false,loop:true,interp:'smooth',speed:1,fps:30};
+const ikS={damp:1.5,step:0.8,iters:80,tol:0.05/* cm */,limits:true,orient:false,ow:3,tq:new THREE.Quaternion(),live:true};
+const target=new THREE.Vector3();
+let ikAxis=null; /* when set, the tool direction is also aligned with this world vector (e.g. straight down) */
+const board={kind:null,connected:false,live:false};
+let needRender=true,dirtySave=false;
+
+/* ================= kinematics ================= */
+const AX={x:new THREE.Vector3(1,0,0),y:new THREE.Vector3(0,1,0),z:new THREE.Vector3(0,0,1)};
+const Y_UP=new THREE.Vector3(0,1,0);
+const ID=new THREE.Matrix4();
+function motion(j,v){
+  const m=new THREE.Matrix4();
+  if(j.type==='revolute')m.makeRotationAxis(AX[j.axis],v*DEG);
+  else if(j.type==='prismatic'){const a=AX[j.axis];m.makeTranslation(a.x*v,a.y*v,a.z*v);}
+  return m;
+}
+function fk(qv){
+  let T=new THREE.Matrix4();const pre=[],post=[];
+  arm.joints.forEach((j,i)=>{
+    T=T.clone().multiply(new THREE.Matrix4().makeTranslation(j.off[0],j.off[1],j.off[2]));
+    pre.push(T.clone());
+    T=T.clone().multiply(motion(j,qv[i]));
+    post.push(T.clone());
+  });
+  const tool=T.clone().multiply(new THREE.Matrix4().makeTranslation(arm.tool[0],arm.tool[1],arm.tool[2]));
+  return {pre,post,tool};
+}
+const posOf=m=>new THREE.Vector3().setFromMatrixPosition(m);
+function rotVec(qt){
+  let {x,y,z,w}=qt;if(w<0){x=-x;y=-y;z=-z;w=-w;}
+  const s=Math.hypot(x,y,z);if(s<1e-9)return [0,0,0];
+  const ang=2*Math.atan2(s,w);return [x/s*ang,y/s*ang,z/s*ang];
+}
+function solveLin(A,b){
+  const n=b.length;const M=A.map((r,i)=>[...r,b[i]]);
+  for(let c=0;c<n;c++){
+    let p=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;
+    [M[c],M[p]]=[M[p],M[c]];const d=M[c][c]||1e-9;
+    for(let r=c+1;r<n;r++){const f=M[r][c]/d;for(let k=c;k<=n;k++)M[r][k]-=f*M[c][k];}
+  }
+  const x=new Array(n).fill(0);
+  for(let r=n-1;r>=0;r--){let s=M[r][n];for(let k=r+1;k<n;k++)s-=M[r][k]*x[k];x[r]=s/(M[r][r]||1e-9);}
+  return x;
+}
+/* Damped least squares: dq = Jt (J Jt + λ² I)^-1 e, finite-difference Jacobian */
+function ikRun(q0,tp){
+  const act=[];arm.joints.forEach((j,i)=>{if(j.ik&&j.type!=='gripper')act.push(i);});
+  const x=q0.slice();const useRot=ikS.orient,useAx=!useRot&&!!ikAxis,rows6=useRot||useAx,m=rows6?6:3;
+  const tdir=new THREE.Vector3(arm.tool[0],arm.tool[1],arm.tool[2]);if(tdir.lengthSq()<1e-9)tdir.set(0,0,1);tdir.normalize();
+  const tq=ikS.tq;let it=0,err=Infinity;
+  const errOf=f=>{
+    const p=posOf(f.tool);const e=[tp.x-p.x,tp.y-p.y,tp.z-p.z];
+    if(useRot){const cq=new THREE.Quaternion().setFromRotationMatrix(f.tool);
+      const r=rotVec(tq.clone().multiply(cq.invert()));e.push(r[0]*ikS.ow,r[1]*ikS.ow,r[2]*ikS.ow);}
+    else if(useAx){const c=tdir.clone().transformDirection(f.tool).cross(ikAxis);e.push(c.x*ikS.ow,c.y*ikS.ow,c.z*ikS.ow);}
+    return e;
+  };
+  if(!act.length)return {x,err:posOf(fk(x).tool).distanceTo(tp),iters:0,ok:false};
+  for(it=0;it<ikS.iters;it++){
+    const f=fk(x);const e=errOf(f);
+    err=Math.hypot(e[0],e[1],e[2]);
+    const rotOK=!rows6||Math.hypot(e[3],e[4],e[5])/ikS.ow<(useRot?0.01:0.02);
+    if(err<ikS.tol&&rotOK)break;
+    const p0=posOf(f.tool),cq0=new THREE.Quaternion().setFromRotationMatrix(f.tool);
+    const cols=act.map(i=>{
+      const rev=arm.joints[i].type==='revolute';const eps=1e-3;
+      const x2=x.slice();x2[i]+=rev?eps*RAD:eps;
+      const f2_=fk(x2);const p=posOf(f2_.tool);
+      const c=[(p.x-p0.x)/eps,(p.y-p0.y)/eps,(p.z-p0.z)/eps];
+      if(rows6){const cq=new THREE.Quaternion().setFromRotationMatrix(f2_.tool);
+        const r=rotVec(cq.multiply(cq0.clone().invert()));c.push(r[0]/eps*ikS.ow,r[1]/eps*ikS.ow,r[2]/eps*ikS.ow);}
+      return c;
+    });
+    const A=[];for(let r=0;r<m;r++){A.push([]);for(let c=0;c<m;c++){let s=0;for(let k=0;k<cols.length;k++)s+=cols[k][r]*cols[k][c];A[r].push(s+(r===c?ikS.damp*ikS.damp:0));}}
+    const y=solveLin(A,e);
+    let dq=cols.map(col=>{let s=0;for(let r=0;r<m;r++)s+=col[r]*y[r];return s*ikS.step;});
+    let big=0;dq.forEach((d,k)=>{const rev=arm.joints[act[k]].type==='revolute';big=Math.max(big,Math.abs(d)/(rev?0.35:3));});
+    if(big>1)dq=dq.map(d=>d/big);
+    act.forEach((i,k)=>{const j=arm.joints[i];x[i]+=j.type==='revolute'?dq[k]*RAD:dq[k];if(ikS.limits)x[i]=clamp(x[i],j.min,j.max);});
+  }
+  const fin=fk(x);err=posOf(fin.tool).distanceTo(tp);
+  return {x,err,iters:it,ok:err<ikS.tol*1.5};
+}
+
+/* Multi-start wrapper: when the warm start fails, retry from home / zero / mid-range / pseudo-random seeds. */
+function ikSolve(q0,tp,restarts){
+  let best=ikRun(q0,tp);
+  if(best.ok||!restarts)return best;
+  const free=arm.joints.map(j=>j.ik&&j.type!=='gripper');
+  const mk=fn=>arm.joints.map((j,i)=>free[i]?clamp(fn(j),j.min,j.max):q0[i]);
+  const seeds=[mk(j=>j.home),mk(()=>0),mk(j=>(j.min+j.max)/2)];
+  let s=12345;const rnd=()=>{s=(s*1664525+1013904223)%4294967296;return s/4294967296;};
+  for(let k=0;k<8;k++)seeds.push(mk(j=>j.min+rnd()*(j.max-j.min)));
+  for(const sd of seeds){
+    const r=ikRun(sd,tp);
+    if(r.ok)return r;
+    if(r.err<best.err)best=r;
+  }
+  return best;
+}
+
+/* Pick helper: solve for a tool tip position with the tool pointing straight down; fall back to position only. */
+function ikSolveDown(q0,p){
+  const dn=new THREE.Vector3(0,0,-1);
+  const dirOf=qv=>{const t=new THREE.Vector3(arm.tool[0],arm.tool[1],arm.tool[2]);if(t.lengthSq()<1e-9)t.set(0,0,1);return t.normalize().transformDirection(fk(qv).tool);};
+  const saveOrient=ikS.orient;ikS.orient=false;
+  try{
+    ikAxis=dn;
+    const r=ikSolve(q0,p,true);
+    const ang=Math.acos(clamp(dirOf(r.x).dot(dn),-1,1))*RAD;
+    if(r.ok&&ang<12)return {...r,down:true};
+    ikAxis=null;
+    const r2=ikSolve(q0,p,true);
+    return {...r2,down:false};
+  }finally{ikAxis=null;ikS.orient=saveOrient;}
+}
+
+/* ================= 3D scene ================= */
+const canvas=$('#gl');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(42,1,0.5,3000);
+camera.up.set(0,0,1);
+const cam={az:-55*DEG,pol:62*DEG,r:95,c:new THREE.Vector3(8,0,14)};
+function applyCam(){
+  const s=Math.sin(cam.pol);
+  camera.position.set(cam.c.x+cam.r*s*Math.cos(cam.az),cam.c.y+cam.r*s*Math.sin(cam.az),cam.c.z+cam.r*Math.cos(cam.pol));
+  camera.lookAt(cam.c);camera.updateMatrixWorld();
+  tgtGroup.scale.setScalar(cam.r/95);need();
+}
+function need(){needRender=true;}
+scene.add(new THREE.HemisphereLight(0xffffff,0x606070,0.95));
+const sun=new THREE.DirectionalLight(0xffffff,0.75);sun.position.set(40,-30,90);scene.add(sun);
+let grid=null,gridOn=true;
+function buildGrid(){
+  if(grid){scene.remove(grid);grid.geometry.dispose();}
+  const bg=new THREE.Color(cssv('--view')||'#38383d');const lum=0.2126*bg.r+0.7152*bg.g+0.0722*bg.b;
+  const main=lum>0.5?0x7a7f88:0x6a6a72,sub=lum>0.5?0xa3a7ae:0x4a4a52;
+  grid=new THREE.GridHelper(200,20,main,sub);grid.rotation.x=Math.PI/2;grid.visible=gridOn;scene.add(grid);need();
+}
+const axisLines=new THREE.Group();
+[[0xe0533f,[30,0,0]],[0x7ac043,[0,30,0]],[0x3f8fe0,[0,0,30]]].forEach(([c,p])=>{
+  const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0.02),new THREE.Vector3(...p)]);
+  axisLines.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:c})));});
+scene.add(axisLines);
+const base=new THREE.Mesh(new THREE.CylinderGeometry(7,8,1.4,40),new THREE.MeshStandardMaterial({color:0x50545c,roughness:.7}));
+base.rotation.x=Math.PI/2;base.position.z=-0.7;scene.add(base);
+
+const armGroup=new THREE.Group();scene.add(armGroup);
+const unitCyl=new THREE.CylinderGeometry(1,1,1,20),unitBox=new THREE.BoxGeometry(1,1,1),unitSph=new THREE.SphereGeometry(1,16,12);
+const matLink=new THREE.MeshStandardMaterial({color:0xaeb4c0,roughness:.55,metalness:.15});
+const matRail=new THREE.MeshStandardMaterial({color:0x8b93a3,roughness:.6});
+const matGrip=new THREE.MeshStandardMaterial({color:0xd8dbe2,roughness:.5});
+const AXC={x:0xe0533f,y:0x7ac043,z:0x3f8fe0};
+let vis=null;
+function bar(m,a,b,r){
+  const d=new THREE.Vector3().subVectors(b,a);const L=d.length();
+  if(L<1e-4){m.visible=false;return;}
+  m.visible=true;
+  m.matrix.compose(a.clone().add(b).multiplyScalar(.5),new THREE.Quaternion().setFromUnitVectors(Y_UP,d.multiplyScalar(1/L)),new THREE.Vector3(r,L,r));
+  m.matrixWorldNeedsUpdate=true;
+}
+function autoMesh(geo,mat){const m=new THREE.Mesh(geo,mat);m.matrixAutoUpdate=false;return m;}
+function rebuildArm(){
+  while(armGroup.children.length)armGroup.remove(armGroup.children[0]);
+  vis={links:[],marks:[],mats:[],rails:[],rods:[],grips:[],pick:[]};
+  arm.joints.forEach((j,i)=>{
+    const link=autoMesh(unitCyl,matLink);armGroup.add(link);vis.links.push(link);
+    const grp=new THREE.Group();grp.matrixAutoUpdate=false;armGroup.add(grp);
+    const mat=new THREE.MeshStandardMaterial({color:AXC[j.axis],roughness:.45,metalness:.1});vis.mats.push(mat);
+    let mesh;
+    if(j.type==='revolute'){mesh=new THREE.Mesh(unitCyl,mat);mesh.scale.set(2.2,3.2,2.2);mesh.quaternion.setFromUnitVectors(Y_UP,AX[j.axis]);}
+    else if(j.type==='prismatic'){mesh=new THREE.Mesh(unitBox,mat);const s=new THREE.Vector3(3.2,3.2,3.2);s[j.axis]=4.6;mesh.scale.copy(s);}
+    else{mesh=new THREE.Mesh(unitSph,mat);mesh.scale.setScalar(1.7);}
+    mesh.userData.joint=i;grp.add(mesh);vis.marks.push(grp);vis.pick.push(mesh);
+    if(j.type==='prismatic'){const r=autoMesh(unitBox,matRail);armGroup.add(r);vis.rails.push(r);const rod=autoMesh(unitCyl,matLink);armGroup.add(rod);vis.rods.push(rod);}
+    else{vis.rails.push(null);vis.rods.push(null);}
+    if(j.type==='gripper'){const a=autoMesh(unitBox,matGrip),b=autoMesh(unitBox,matGrip);armGroup.add(a,b);vis.grips.push([a,b]);}
+    else vis.grips.push(null);
+  });
+  vis.toolLink=autoMesh(unitCyl,matLink);armGroup.add(vis.toolLink);
+  vis.toolDot=new THREE.Mesh(unitSph,new THREE.MeshStandardMaterial({color:0xd9562e,roughness:.4}));vis.toolDot.scale.setScalar(.9);armGroup.add(vis.toolDot);
+  vis.toolAxes=new THREE.AxesHelper(4.5);vis.toolAxes.matrixAutoUpdate=false;armGroup.add(vis.toolAxes);
+  const lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-7,0),new THREE.Vector3(0,7,0)]);
+  vis.selAxis=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xd9562e}));vis.selAxis.matrixAutoUpdate=false;armGroup.add(vis.selAxis);
+  paintSel();
+}
+function paintSel(){
+  if(!vis)return;
+  arm.joints.forEach((j,i)=>{vis.mats[i].color.setHex(i===sel?0xd9562e:AXC[j.axis]);});need();
+}
+function updateVisual(){
+  if(!vis)return;
+  const f=fk(q),n=arm.joints.length;
+  arm.joints.forEach((j,i)=>{
+    const a=i?posOf(f.post[i-1]):new THREE.Vector3(),b=posOf(f.pre[i]);
+    bar(vis.links[i],a,b,1.15);
+    vis.marks[i].matrix.copy(f.post[i]);vis.marks[i].matrixWorldNeedsUpdate=true;
+    if(j.type==='prismatic'){
+      const ax=AX[j.axis].clone().transformDirection(f.pre[i]);
+      bar(vis.rails[i],b.clone().addScaledVector(ax,j.min),b.clone().addScaledVector(ax,j.max),.45);
+      bar(vis.rods[i],b,posOf(f.post[i]),.9);
+    }
+    if(j.type==='gripper'){
+      const dv=new THREE.Vector3(...(i<n-1?arm.joints[i+1].off:arm.tool));const Lf=Math.max(dv.length(),2);
+      if(dv.lengthSq()<1e-6)dv.set(0,0,1);dv.normalize();
+      const gap=0.5+(q[i]/100)*2.5,oa=AX[j.axis];
+      [1,-1].forEach((sg,k)=>{
+        const c=oa.clone().multiplyScalar(sg*gap).addScaledVector(dv,Lf/2);
+        const ml=new THREE.Matrix4().compose(c,new THREE.Quaternion().setFromUnitVectors(Y_UP,dv),new THREE.Vector3(.6,Lf,.6));
+        const g=vis.grips[i][k];g.matrix.copy(f.post[i]).multiply(ml);g.matrixWorldNeedsUpdate=true;});
+    }
+  });
+  const last=arm.joints[n-1],tp=posOf(f.tool);
+  bar(vis.toolLink,posOf(f.post[n-1]),tp,.8);
+  if(last&&last.type==='gripper')vis.toolLink.visible=false;
+  vis.toolDot.position.copy(tp);vis.toolAxes.matrix.copy(f.tool);vis.toolAxes.matrixWorldNeedsUpdate=true;
+  const s=arm.joints[sel];
+  if(s){vis.selAxis.visible=true;vis.selAxis.matrix.copy(f.post[sel]).multiply(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(Y_UP,AX[s.axis])));vis.selAxis.matrixWorldNeedsUpdate=true;}
+  else vis.selAxis.visible=false;
+  $('#sbTool').textContent='x '+f2(tp.x)+'  y '+f2(tp.y)+'  z '+f2(tp.z)+' cm';
+  trailPush(tp);need();
+}
+
+/* ---- trail ---- */
+const TRAIL_MAX=4000;let trailN=0,trailOn=false;
+const trailGeo=new THREE.BufferGeometry();trailGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(TRAIL_MAX*3),3));trailGeo.setDrawRange(0,0);
+const trailLine=new THREE.Line(trailGeo,new THREE.LineBasicMaterial({color:0xd9562e}));trailLine.frustumCulled=false;scene.add(trailLine);
+function trailPush(p){
+  if(!trailOn)return;
+  const a=trailGeo.attributes.position.array;
+  if(trailN>0){const dx=a[(trailN-1)*3]-p.x,dy=a[(trailN-1)*3+1]-p.y,dz=a[(trailN-1)*3+2]-p.z;if(dx*dx+dy*dy+dz*dz<0.04)return;}
+  if(trailN>=TRAIL_MAX){a.copyWithin(0,3);trailN=TRAIL_MAX-1;}
+  a[trailN*3]=p.x;a[trailN*3+1]=p.y;a[trailN*3+2]=p.z;trailN++;
+  trailGeo.setDrawRange(0,trailN);trailGeo.attributes.position.needsUpdate=true;
+}
+function trailClear(){trailN=0;trailGeo.setDrawRange(0,0);need();}
+
+/* ---- IK target gizmo ---- */
+const tgtGroup=new THREE.Group();scene.add(tgtGroup);
+const tgtSphere=new THREE.Mesh(unitSph,new THREE.MeshStandardMaterial({color:0xd9562e,roughness:.35,transparent:true,opacity:.9}));tgtSphere.scale.setScalar(1.3);tgtSphere.name='free';tgtGroup.add(tgtSphere);
+const tgtPick=[tgtSphere];
+[['x',0xe0533f],['y',0x7ac043],['z',0x3f8fe0]].forEach(([k,c])=>{
+  const a=AX[k];const mat=new THREE.MeshBasicMaterial({color:c});
+  const shaft=new THREE.Mesh(unitCyl,mat);shaft.scale.set(.28,8,.28);shaft.position.copy(a).multiplyScalar(6);shaft.quaternion.setFromUnitVectors(Y_UP,a);
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(.9,2.6,14),mat);cone.position.copy(a).multiplyScalar(11.3);cone.quaternion.setFromUnitVectors(Y_UP,a);
+  const hit=new THREE.Mesh(unitCyl,new THREE.MeshBasicMaterial({visible:false}));hit.scale.set(1.6,14,1.6);hit.position.copy(a).multiplyScalar(7.5);hit.quaternion.setFromUnitVectors(Y_UP,a);hit.name=k;
+  tgtGroup.add(shaft,cone,hit);tgtPick.push(hit);
+});
+function placeTarget(){tgtGroup.position.copy(target);need();}
+
+/* ---- viewport size & render loop ---- */
+function resize(){
+  const w=$('#viewwrap');const W=Math.max(50,w.clientWidth),H=Math.max(50,w.clientHeight);
+  renderer.setSize(W,H,false);camera.aspect=W/H;camera.updateProjectionMatrix();need();
+}
+new ResizeObserver(resize).observe($('#viewwrap'));
+function frame(now){
+  requestAnimationFrame(frame);
+  tickPlayback(now);
+  if(needRender){needRender=false;renderer.render(scene,camera);}
+  if(typeof renderMiniView==='function')renderMiniView();
+}
+
+/* ---- mouse / touch interaction ---- */
+const ray=new THREE.Raycaster();const mouse=new THREE.Vector2();
+const pointers=new Map();let drag=null,pinch=null;
+function setRay(e){const r=canvas.getBoundingClientRect();mouse.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mouse,camera);}
+function axisParam(p0,a){
+  const d=ray.ray.direction,w=new THREE.Vector3().subVectors(p0,ray.ray.origin);
+  const b=a.dot(d),dd=a.dot(w),ee=d.dot(w),den=1-b*b;
+  return den<1e-6?0:(b*ee-dd)/den;
+}
+function panCam(dx,dy){
+  const k=cam.r*Math.tan(camera.fov*DEG/2)*2/canvas.clientHeight;
+  const right=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0),up=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);
+  cam.c.addScaledVector(right,-dx*k).addScaledVector(up,dy*k);applyCam();
+}
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size===2){const [a,b]=[...pointers.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2};drag=null;return;}
+  setRay(e);
+  const hit=e.button===0?ray.intersectObjects(tgtPick,false)[0]:null;
+  if(hit){
+    const nm=hit.object.name;
+    if(nm==='free'){const n=camera.getWorldDirection(new THREE.Vector3());const pl=new THREE.Plane().setFromNormalAndCoplanarPoint(n,target);
+      const p=ray.ray.intersectPlane(pl,new THREE.Vector3())||target.clone();drag={mode:'free',pl,off:p.sub(target)};}
+    else{const a=AX[nm];drag={mode:'axis',a,start:target.clone(),s0:axisParam(target,a)};}
+    canvas.style.cursor='move';return;
+  }
+  drag={mode:(e.button===1||e.button===2||e.shiftKey)?'pan':'orbit',x:e.clientX,y:e.clientY,moved:0,sx:e.clientX,sy:e.clientY};
+});
+canvas.addEventListener('pointermove',e=>{
+  const prev=pointers.get(e.pointerId);if(!prev)return;
+  if(pinch&&pointers.size===2){
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    cam.r=clamp(cam.r*pinch.d/Math.max(d,1),12,500);panCam(mx-pinch.mx,my-pinch.my);pinch={d,mx,my};return;
+  }
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(!drag)return;
+  if(drag.mode==='orbit'){
+    const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.moved+=Math.abs(dx)+Math.abs(dy);drag.x=e.clientX;drag.y=e.clientY;
+    cam.az-=dx*0.008;cam.pol=clamp(cam.pol-dy*0.008,0.03,Math.PI-0.03);applyCam();
+  }else if(drag.mode==='pan'){
+    const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;panCam(dx,dy);
+  }else{
+    setRay(e);
+    if(drag.mode==='free'){const p=ray.ray.intersectPlane(drag.pl,new THREE.Vector3());if(p)target.copy(p.sub(drag.off));}
+    else{const s=axisParam(drag.start,drag.a)-drag.s0;target.copy(drag.start).addScaledVector(drag.a,s);}
+    placeTarget();syncTargetFields();
+    if(ikS.live)runIK('drag');
+  }
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if(pointers.size<2)pinch=null;
+  if(drag&&drag.mode==='orbit'&&drag.moved<5&&e.type==='pointerup'){
+    setRay(e);const hit=ray.intersectObjects(vis.pick,false)[0];
+    if(hit)selectJoint(hit.object.userData.joint);
+  }
+  if(drag&&(drag.mode==='free'||drag.mode==='axis')&&!ikS.live)runIK('drag');
+  drag=null;canvas.style.cursor='grab';
+}
+canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);
+canvas.addEventListener('wheel',e=>{e.preventDefault();cam.r=clamp(cam.r*Math.exp(e.deltaY*0.001),12,500);applyCam();},{passive:false});
+function setView(v){
+  if(v==='top'){cam.az=-90*DEG;cam.pol=0.03;}
+  else if(v==='front'){cam.az=-90*DEG;cam.pol=90*DEG;}
+  else if(v==='right'){cam.az=0;cam.pol=90*DEG;}
+  else{cam.az=-55*DEG;cam.pol=62*DEG;}
+  applyCam();
+}
+
+/* ================= app state helpers ================= */
+function loadArm(a,keepKeys){
+  arm=a;
+  q=arm.joints.map(j=>j.home);
+  if(!keepKeys)keys=arm.joints.map(()=>[]);
+  sel=clamp(sel,0,arm.joints.length-1);
+  structChanged(true);
+  const p=posOf(fk(q).tool);target.copy(p);snapTarget();
+}
+function structChanged(rebuildPanes){
+  rebuildArm();updateVisual();
+  buildPoseUI();buildIkJoints();
+  if(rebuildPanes)renderBuild();
+  dsResize();refreshHud();regenFw();markDirty();
+}
+function selectJoint(i){
+  sel=clamp(i,0,arm.joints.length-1);paintSel();refreshPoseUI();refreshHud();renderBuild();drawDS();
+  updateVisual();
+}
+function snapTarget(){
+  const f=fk(q);target.copy(posOf(f.tool));ikS.tq.setFromRotationMatrix(f.tool);
+  placeTarget();syncTargetFields();$('#ikinfo').hidden=true;tgtSphere.material.color.setHex(0xd9562e);
+}
+function syncTargetFields(){['X','Y','Z'].forEach((c,i)=>{const el=$('#tg'+c);if(document.activeElement!==el)el.value=(+target.getComponent(i)).toFixed(2);});}
+function afterPose(src){
+  const ik=(src==='ik');
+  updateVisual();refreshPoseUI();refreshHud();
+  if(!ik)snapTarget();
+  if(src!=='read')queueSend();
+  drawDS();markDirty();
+}
+function setJoint(i,v,src){
+  const j=arm.joints[i];q[i]=clamp(num(v,q[i]),j.min,j.max);afterPose(src||'user');
+}
+function runIK(src){
+  const r=ikSolve(q,target,src!=='drag');
+  q=r.x.map((v,i)=>clamp(v,arm.joints[i].min,arm.joints[i].max));
+  tgtSphere.material.color.setHex(r.ok?0xd9562e:0xe0533f);
+  const info=$('#ikinfo');info.hidden=false;
+  info.textContent=r.ok?'IK reached the target':'Out of reach · nearest point '+(r.err*10).toFixed(1)+' mm away';
+  $('#ikOut').textContent=(r.ok?'Reached':'Out of reach')+' · error '+(r.err*10).toFixed(2)+' mm · '+r.iters+' iterations';
+  afterPose('ik');return r;
+}
+
+/* ================= pose list, HUD ================= */
+const AXCSS={x:'var(--x)',y:'var(--y)',z:'var(--z)'};
+const unitOf=j=>j.type==='revolute'?'°':j.type==='prismatic'?' cm':' %';
+function buildPoseUI(){
+  const box=$('#poseList');box.innerHTML='';
+  arm.joints.forEach((j,i)=>{
+    const r=h('div',{class:'jr',id:'jr'+i},
+      h('span',{class:'chip',style:'background:'+AXCSS[j.axis]}),
+      h('span',{class:'nm',text:(i+1)+'. '+j.name,onclick:()=>selectJoint(i)}),
+      h('input',{type:'range',min:j.min,max:j.max,step:j.type==='revolute'?0.5:0.1,'aria-label':j.name,oninput:e=>setJoint(i,e.target.value)}),
+      h('input',{type:'number',step:0.1,'aria-label':j.name+' value',onchange:e=>setJoint(i,e.target.value)}),
+      h('button',{class:'kb',title:'Set a key on this axis',text:'◆',onclick:()=>{selectJoint(i);insertKey(i);}}));
+    box.append(r);
+  });
+  refreshPoseUI();
+}
+function hasKeyAt(i,t){return keys[i]&&keys[i].some(k=>Math.abs(k.t-t)<0.5/tl.fps);}
+function refreshPoseUI(){
+  arm.joints.forEach((j,i)=>{
+    const r=$('#jr'+i);if(!r)return;
+    r.classList.toggle('sel',i===sel);
+    const sl=$('input[type=range]',r),nb=$('input[type=number]',r);
+    sl.value=q[i];if(document.activeElement!==nb)nb.value=(+q[i]).toFixed(1);
+    $('.kb',r).classList.toggle('has',hasKeyAt(i,tl.t));
+  });
+}
+function refreshHud(){
+  const j=arm.joints[sel];if(!j)return;
+  $('#hudName').textContent=j.name;
+  const s=$('#hudSlider');s.min=j.min;s.max=j.max;s.step=j.type==='revolute'?0.5:0.1;s.value=q[sel];
+  const n=$('#hudNum');if(document.activeElement!==n)n.value=(+q[sel]).toFixed(1);
+  $('#hudKey').classList.toggle('on',hasKeyAt(sel,tl.t));
+  $('#sbSel').textContent='Selected: '+j.name+'  '+(+q[sel]).toFixed(1)+unitOf(j);
+}
+$('#hudSlider').addEventListener('input',e=>setJoint(sel,e.target.value));
+$('#hudNum').addEventListener('change',e=>setJoint(sel,e.target.value));
+$('#hudKey').addEventListener('click',()=>insertKey(sel));
+$('#hudSend').addEventListener('click',()=>{if(!sendLine('J '+sel+' '+f2(q[sel])))toast('Connect a board first (Serial tab).',true);});
+$('#btnHome').addEventListener('click',()=>{q=arm.joints.map(j=>j.home);afterPose('user');});
+$('#btnZero').addEventListener('click',()=>{q=arm.joints.map(j=>clamp(0,j.min,j.max));afterPose('user');});
+
+/* ================= IK pane ================= */
+function buildIkJoints(){
+  const box=$('#ikJoints');box.innerHTML='';
+  arm.joints.forEach((j,i)=>{
+    if(j.type==='gripper')return;
+    box.append(h('label',{class:'sw',style:'display:flex;margin:3px 0'},h('input',{type:'checkbox',checked:j.ik,onchange:e=>{j.ik=e.target.checked;markDirty();}}),h('i'),(i+1)+'. '+j.name));
+  });
+}
+['X','Y','Z'].forEach((c,i)=>$('#tg'+c).addEventListener('change',e=>{target.setComponent(i,num(e.target.value));placeTarget();runIK('field');}));
+$('#ikSolve').addEventListener('click',()=>runIK('button'));
+$('#ikSnap').addEventListener('click',snapTarget);
+$('#ikLive').addEventListener('change',e=>{ikS.live=e.target.checked;});
+$('#ikOrient').addEventListener('change',e=>{ikS.orient=e.target.checked;if(ikS.orient)ikS.tq.setFromRotationMatrix(fk(q).tool);});
+$('#ikLimits').addEventListener('change',e=>{ikS.limits=e.target.checked;});
+const bindRange=(id,key,fn)=>{const el=$('#'+id);const upd=()=>{ikS[key]=fn?fn(+el.value):+el.value;$('#'+id+'V').textContent=el.value;markDirty();};el.addEventListener('input',upd);};
+bindRange('ikDamp','damp');bindRange('ikStep','step');bindRange('ikOW','ow');
+$('#ikIter').addEventListener('change',e=>{ikS.iters=clamp(Math.round(num(e.target.value,80)),1,500);});
+$('#ikTol').addEventListener('change',e=>{ikS.tol=clamp(num(e.target.value,.5),0.01,20)/10;});
+const IKP={fast:{damp:2.5,step:1,iters:25,tol:2},smooth:{damp:3,step:0.5,iters:60,tol:1},precise:{damp:0.6,step:0.9,iters:250,tol:0.05}};
+$$('[data-ikp]').forEach(b=>b.addEventListener('click',()=>{
+  const p=IKP[b.dataset.ikp];ikS.damp=p.damp;ikS.step=p.step;ikS.iters=p.iters;ikS.tol=p.tol/10;
+  $('#ikDamp').value=p.damp;$('#ikDampV').textContent=p.damp;$('#ikStep').value=p.step;$('#ikStepV').textContent=p.step;$('#ikIter').value=p.iters;$('#ikTol').value=p.tol;
+  toast('IK preset: '+b.dataset.ikp);markDirty();}));
+
+/* ================= build-arm pane ================= */
+const MOTOR_LABEL={servo:'Hobby servo (PWM pin)',stepper:'Stepper (STEP/DIR driver)',pca9685:'Servo on PCA9685 board',none:'None (virtual)'};
+function field(label,el){return h('div',{class:'row'},h('label',{text:label}),el);}
+function numIn(obj,key,step,after){return h('input',{type:'number',step:step||0.5,value:obj[key],onchange:e=>{obj[key]=num(e.target.value,obj[key]);(after||edited)();}});}
+function edited(){
+  arm.joints.forEach((j,i)=>{q[i]=clamp(q[i],j.min,j.max);});
+  rebuildArm();updateVisual();buildPoseUI();refreshHud();dsResize();regenFw();markDirty();
+}
+function offAxisIndex(off){
+  let bi=0,bv=Math.abs(off[0]);
+  for(let i=1;i<3;i++)if(Math.abs(off[i])>bv){bv=Math.abs(off[i]);bi=i;}
+  return bi;
+}
+function maxReach(){
+  let r=0;
+  arm.joints.forEach(j=>{r+=Math.hypot(j.off[0],j.off[1],j.off[2]);if(j.type==='prismatic')r+=Math.max(Math.abs(j.min),Math.abs(j.max));});
+  return r+Math.hypot(arm.tool[0],arm.tool[1],arm.tool[2]);
+}
+function renderBuild(){
+  $('#armName').value=arm.name;
+  const list=$('#jlist');list.innerHTML='';
+  arm.joints.forEach((j,i)=>{
+    list.append(h('div',{class:'li'+(i===sel?' sel':''),onclick:()=>selectJoint(i)},
+      h('span',{class:'t',text:(i+1)+'. '+j.name}),h('span',{class:'m',text:j.type+' '+j.axis}),
+      h('button',{title:'Move up','aria-label':'Move up',text:'↑',onclick:e=>{e.stopPropagation();moveJoint(i,-1);}}),
+      h('button',{title:'Move down','aria-label':'Move down',text:'↓',onclick:e=>{e.stopPropagation();moveJoint(i,1);}}),
+      h('button',{title:'Delete joint','aria-label':'Delete joint',text:'✕',onclick:e=>{e.stopPropagation();delJoint(i);}})));
+  });
+  const toi=offAxisIndex(arm.tool),toax='xyz'[toi];
+  const TF=$('#toolForm');TF.innerHTML='';
+  TF.append(
+    field('Length',h('input',{type:'number',step:0.5,value:+arm.tool[toi].toFixed(3),'aria-label':'Tool length (cm)',onchange:e=>{arm.tool=[0,0,0];arm.tool[toi]=num(e.target.value);edited();snapTarget();renderBuild();}})),
+    field('Direction',h('select',{'aria-label':'Tool direction',onchange:e=>{const ni='xyz'.indexOf(e.target.value),mag=arm.tool[toi];arm.tool=[0,0,0];arm.tool[ni]=mag;edited();snapTarget();renderBuild();}},
+      ['x','y','z'].map(a=>h('option',{value:a,selected:a===toax,text:a.toUpperCase()})))),
+    h('details',{class:'pn'},h('summary',{text:'Advanced: custom offset'}),h('div',{class:'pnb'},
+      h('p',{class:'hint',text:'Only needed when the tool isn\u2019t straight along one axis.'}),
+      h('div',{class:'row2'},[0,1,2].map(k=>h('input',{type:'number',step:0.5,value:arm.tool[k],'aria-label':'Tool offset '+'XYZ'[k],onchange:e=>{arm.tool[k]=num(e.target.value);edited();snapTarget();renderBuild();}}))))));
+  $('#armReach').textContent='Estimated max reach: '+maxReach().toFixed(1)+' cm straight-line from the base (ignores collisions)';
+  $('#ikReach').textContent='This arm can solve targets up to about '+maxReach().toFixed(1)+' cm from the base (sum of link lengths).';
+  const j=arm.joints[sel],m=j.motor,F=$('#jform');F.innerHTML='';
+  const ax=h('select',{onchange:e=>{j.axis=e.target.value;edited();}},['x','y','z'].map(a=>h('option',{value:a,selected:j.axis===a,text:a.toUpperCase()})));
+  const ty=h('select',{onchange:e=>{j.type=e.target.value;if(j.type==='gripper'){j.min=0;j.max=100;j.home=60;j.ik=false;}
+    if(j.type==='prismatic'&&j.max>50){j.min=0;j.max=20;j.home=8;}if(j.type==='revolute'&&j.max<=20){j.min=-90;j.max=90;j.home=0;}
+    q[sel]=clamp(j.home,j.min,j.max);edited();renderBuild();buildIkJoints();}},
+    ['revolute','prismatic','gripper'].map(t=>h('option',{value:t,selected:j.type===t,text:t==='revolute'?'Revolute (rotates)':t==='prismatic'?'Prismatic (slides)':'Gripper (opens)'})));
+  const oi=offAxisIndex(j.off),oax='xyz'[oi];
+  const lenSel=h('select',{'aria-label':'Link direction',onchange:e=>{const ni='xyz'.indexOf(e.target.value),mag=j.off[oi];j.off=[0,0,0];j.off[ni]=mag;edited();snapTarget();renderBuild();}},
+    ['x','y','z'].map(a=>h('option',{value:a,selected:a===oax,text:a.toUpperCase()+(a===oax?'':'')})));
+  F.append(h('h3',{text:'Selected joint'}),
+    field('Name',h('input',{type:'text',value:j.name,onchange:e=>{j.name=e.target.value||'Joint';renderBuild();buildPoseUI();buildIkJoints();refreshHud();dsResize();regenFw();markDirty();}})),
+    field('Type',ty),field(j.type==='revolute'?'Rotation axis':j.type==='prismatic'?'Slide axis':'Opening axis',ax),
+    h('div',{class:'hint',text:'Link length: how far this joint sits from the previous one \u2014 measure it with a ruler'}),
+    field('Length',h('input',{type:'number',step:0.5,value:+j.off[oi].toFixed(3),'aria-label':'Link length (cm)',onchange:e=>{j.off=[0,0,0];j.off[oi]=num(e.target.value);edited();snapTarget();renderBuild();}})),
+    field('Direction',lenSel),
+    h('details',{class:'pn'},h('summary',{text:'Advanced: custom offset'}),h('div',{class:'pnb'},
+      h('p',{class:'hint',text:'Only needed for a link that is not straight along one axis.'}),
+      h('div',{class:'row2'},[0,1,2].map(k=>h('input',{type:'number',step:0.5,value:j.off[k],'aria-label':'Offset '+'XYZ'[k],onchange:e=>{j.off[k]=num(e.target.value);edited();snapTarget();renderBuild();}}))))),
+    field('Min',numIn(j,'min',1)),field('Max',numIn(j,'max',1)),field('Home',numIn(j,'home',1,()=>{q[sel]=clamp(j.home,j.min,j.max);edited();})),
+    h('h3',{text:'Motor'}));
+  const mt=h('select',{onchange:e=>{m.type=e.target.value;
+    if(m.type==='stepper'){m.scale=j.type==='revolute'?+STEP_DEG.toFixed(4):800;m.speed=j.type==='revolute'?90:4;m.accel=j.type==='revolute'?300:40;if(m.b<0)m.b=m.a+1;if(m.en<0)m.en=m.a+2;}
+    else if(m.type==='servo'||m.type==='pca9685'){m.scale=1;}
+    renderBuild();regenFw();markDirty();}},Object.keys(MOTOR_LABEL).map(t=>h('option',{value:t,selected:m.type===t,text:MOTOR_LABEL[t]})));
+  F.append(field('Type',mt));
+  const chg=()=>{regenFw();markDirty();};
+  if(m.type==='servo')F.append(field('Signal pin',numIn(m,'a',1,chg)));
+  if(m.type==='pca9685')F.append(field('PCA channel',numIn(m,'a',1,chg)));
+  if(m.type==='stepper')F.append(field('STEP pin',numIn(m,'a',1,chg)),field('DIR pin',numIn(m,'b',1,chg)),field('ENABLE pin',numIn(m,'en',1,chg)),
+    field('Steps / '+(j.type==='revolute'?'degree':'cm'),numIn(m,'scale',0.01,chg)),field('Max speed /s',numIn(m,'speed',1,chg)),field('Accel /s²',numIn(m,'accel',1,chg)));
+  if(m.type==='servo'||m.type==='pca9685')F.append(field('Centre angle',numIn(m,'center',1,chg)),field('Degrees / unit',numIn(m,'scale',0.01,chg)));
+  if(m.type!=='none')F.append(h('label',{class:'sw',style:'display:flex;margin:6px 0'},h('input',{type:'checkbox',checked:m.inv,onchange:e=>{m.inv=e.target.checked;chg();}}),h('i'),'Reverse direction'));
+  F.append(h('p',{class:'hint',text:m.type==='stepper'?'Default steps assume a 1.8° motor with 1/16 microstepping. Use pin -1 for no enable pin.':m.type==='none'?'This joint moves only in the simulation.':'Servos are driven at 500–2400 µs. Set the range so the servo stays inside 0–180°.'}));
+}
+$('#armName').addEventListener('change',e=>{arm.name=e.target.value||'My arm';regenFw();markDirty();});
+function moveJoint(i,d){
+  const k=i+d;if(k<0||k>=arm.joints.length)return;
+  [arm.joints[i],arm.joints[k]]=[arm.joints[k],arm.joints[i]];[q[i],q[k]]=[q[k],q[i]];[keys[i],keys[k]]=[keys[k],keys[i]];
+  sel=k;structChanged(true);
+}
+function delJoint(i){
+  if(arm.joints.length<=1){toast('An arm needs at least one joint.',true);return;}
+  arm.joints.splice(i,1);q.splice(i,1);keys.splice(i,1);sel=clamp(sel,0,arm.joints.length-1);structChanged(true);
+}
+$('#addJoint').addEventListener('click',()=>{
+  const at=sel+1;const nj=J('Joint '+(arm.joints.length+1),'revolute','y',[0,0,10],-90,90,0,servoM(nextPin()));
+  arm.joints.splice(at,0,nj);q.splice(at,0,0);keys.splice(at,0,[]);sel=at;structChanged(true);
+});
+function nextPin(){let p=2;const used=new Set();arm.joints.forEach(j=>{used.add(j.motor.a);used.add(j.motor.b);used.add(j.motor.en);});while(used.has(p))p++;return p;}
+$('#preset').append(...Object.keys(PRESETS).map(id=>h('option',{value:id,text:PRESETS[id].label})));
+$('#preset').addEventListener('change',e=>{
+  presetId=e.target.value;sel=0;trailClear();tl.t=0;
+  loadArm(buildPreset(presetId));toast('Loaded '+PRESETS[presetId].label+'. Keys were cleared.');
+});
+
+/* ================= keyframes & playback ================= */
+const snapT=t=>Math.round(t*tl.fps)/tl.fps;
+function insertKey(i,t=tl.t,v=q[i]){
+  t=clamp(snapT(t),0,tl.len);
+  const k=keys[i],ex=k.find(x=>Math.abs(x.t-t)<0.5/tl.fps);
+  if(ex)ex.v=v;else{k.push({t,v});k.sort((a,b)=>a.t-b.t);}
+  if($('#keySend').checked&&board.connected)sendLine('J '+i+' '+f2(v));
+  refreshPoseUI();refreshHud();drawDS();markDirty();
+}
+function keyAll(){arm.joints.forEach((j,i)=>insertKey(i));toast('Keys set on all axes at '+f2(tl.t)+' s');}
+function sampleJoint(i,t){
+  const k=keys[i];if(!k||!k.length)return null;
+  if(t<=k[0].t)return k[0].v;const L=k[k.length-1];if(t>=L.t)return L.v;
+  let a=0;while(k[a+1].t<t)a++;
+  const A=k[a],B=k[a+1];let u=(t-A.t)/(B.t-A.t);
+  if(tl.interp==='step')u=0;else if(tl.interp==='smooth')u=u*u*(3-2*u);
+  return A.v+(B.v-A.v)*u;
+}
+function applyTimeline(){
+  let any=false;
+  arm.joints.forEach((j,i)=>{const v=sampleJoint(i,tl.t);if(v!==null){q[i]=clamp(v,j.min,j.max);any=true;}});
+  if(any)afterPose('timeline');else{refreshPoseUI();refreshHud();drawDS();}
+  timeCode();
+}
+function timeCode(){$('#tcode').textContent=tl.t.toFixed(2)+' s · f'+Math.round(tl.t*tl.fps);}
+function setTime(t,apply=true){tl.t=clamp(t,0,tl.len);timeCode();if(apply)applyTimeline();else drawDS();}
+let lastNow=0;
+function tickPlayback(now){
+  const dt=Math.min(0.1,(now-lastNow)/1000);lastNow=now;
+  if(!tl.playing)return;
+  let t=tl.t+dt*tl.speed;
+  if(t>=tl.len){if(tl.loop)t=t%tl.len;else{t=tl.len;setPlaying(false);}}
+  setTime(t);
+}
+function setPlaying(p){tl.playing=p;$('#tPlay').textContent=p?'⏸':'▶';}
+$('#tPlay').addEventListener('click',()=>{if(!tl.playing&&tl.t>=tl.len-1e-6&&!tl.loop)tl.t=0;setPlaying(!tl.playing);});
+$('#tStart').addEventListener('click',()=>setTime(0));
+$('#tEnd').addEventListener('click',()=>setTime(tl.len));
+$('#tLen').addEventListener('change',e=>{tl.len=clamp(num(e.target.value,5),0.5,120);keys.forEach(k=>k.forEach(x=>{x.t=Math.min(x.t,tl.len);}));setTime(tl.t,false);markDirty();});
+$('#tInterp').addEventListener('change',e=>{tl.interp=e.target.value;applyTimeline();markDirty();});
+$('#tSpeed').addEventListener('change',e=>{tl.speed=+e.target.value;});
+$('#tLoop').addEventListener('change',e=>{tl.loop=e.target.checked;markDirty();});
+$('#tKeyAll').addEventListener('click',keyAll);
+$('#tKeySel').addEventListener('click',()=>insertKey(sel));
+$('#tDel').addEventListener('click',deleteSelKeys);
+$('#tClear').addEventListener('click',()=>{if(keys.some(k=>k.length)){keys=arm.joints.map(()=>[]);selKeys.clear();drawDS();refreshPoseUI();markDirty();toast('All keys cleared');}});
+
+/* ---- dopesheet (canvas) ---- */
+const dsC=$('#ds'),dsX=dsC.getContext('2d');
+const LBL=112,RH=22,RULER=24,PADR=14;
+let selKeys=new Set(),dsDrag=null,dsW=600;
+function dsResize(){
+  const wrap=$('#dswrap');dsW=Math.max(300,wrap.clientWidth);
+  const H=RULER+RH*arm.joints.length,dpr=window.devicePixelRatio||1;
+  dsC.width=dsW*dpr;dsC.height=H*dpr;dsC.style.height=H+'px';dsX.setTransform(dpr,0,0,dpr,0,0);drawDS();
+}
+new ResizeObserver(()=>dsResize()).observe($('#dswrap'));
+const t2x=t=>LBL+(t/tl.len)*(dsW-LBL-PADR),x2t=x=>clamp((x-LBL)/(dsW-LBL-PADR)*tl.len,0,tl.len);
+function drawDS(){
+  if(!arm)return;
+  const c=dsX,W=dsW,H=RULER+RH*arm.joints.length;
+  const cRowA=cssv('--rowa'),cRowB=cssv('--rowb'),cTxt=cssv('--text'),cDim=cssv('--dim'),cAcc=cssv('--accent'),cLine=cssv('--line'),cSel=cssv('--sel'),cKey=cssv('--keyc');
+  c.clearRect(0,0,W,H);
+  arm.joints.forEach((j,i)=>{
+    const y=RULER+i*RH;c.fillStyle=i%2?cRowB:cRowA;c.fillRect(0,y,W,RH);
+    if(i===sel){c.fillStyle=cSel;c.globalAlpha=.22;c.fillRect(0,y,W,RH);c.globalAlpha=1;}
+    c.fillStyle=cTxt;c.font='12px "IBM Plex Sans",system-ui,sans-serif';c.textBaseline='middle';c.textAlign='left';
+    c.fillText((i+1)+'. '+j.name,16,y+RH/2,LBL-22);
+    c.fillStyle=({x:cssv('--x'),y:cssv('--y'),z:cssv('--z')})[j.axis];c.fillRect(5,y+5,4,RH-10);
+  });
+  c.fillStyle=cRowB;c.fillRect(0,0,W,RULER);c.strokeStyle=cLine;c.beginPath();c.moveTo(0,RULER+.5);c.lineTo(W,RULER+.5);c.moveTo(LBL+.5,0);c.lineTo(LBL+.5,H);c.stroke();
+  const step=tl.len>30?5:tl.len>12?2:1;
+  c.fillStyle=cDim;c.textAlign='center';c.font='11px "IBM Plex Mono",monospace';
+  for(let s=0;s<=tl.len+1e-6;s+=step){const x=Math.round(t2x(s))+.5;c.strokeStyle=cLine;c.globalAlpha=.5;c.beginPath();c.moveTo(x,RULER-6);c.lineTo(x,H);c.stroke();c.globalAlpha=1;c.fillText(s+'s',x,RULER/2-2);}
+  arm.joints.forEach((j,i)=>{
+    const y=RULER+i*RH+RH/2;
+    keys[i].forEach(k=>{
+      const x=t2x(k.t),on=selKeys.has(k);const r=5.5;
+      c.beginPath();c.moveTo(x,y-r);c.lineTo(x+r,y);c.lineTo(x,y+r);c.lineTo(x-r,y);c.closePath();
+      c.fillStyle=on?cAcc:cKey;c.fill();c.strokeStyle=on?'#fff':cLine;c.lineWidth=1;c.stroke();});
+  });
+  const px=Math.round(t2x(tl.t))+.5;c.strokeStyle=cAcc;c.lineWidth=2;c.beginPath();c.moveTo(px,0);c.lineTo(px,H);c.stroke();c.lineWidth=1;
+  c.fillStyle=cAcc;c.beginPath();c.moveTo(px-6,0);c.lineTo(px+6,0);c.lineTo(px,9);c.closePath();c.fill();
+}
+function dsPos(e){const r=dsC.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+function keyAt(x,y){
+  const i=Math.floor((y-RULER)/RH);if(i<0||i>=arm.joints.length)return null;
+  for(const k of keys[i])if(Math.abs(t2x(k.t)-x)<8)return {i,k};return null;
+}
+dsC.addEventListener('pointerdown',e=>{
+  dsC.setPointerCapture(e.pointerId);const p=dsPos(e);
+  if(p.y<RULER||p.x>=LBL&&!keyAt(p.x,p.y)&&p.y>=RULER){
+    if(p.y>=RULER){const i=Math.floor((p.y-RULER)/RH);if(i>=0&&i<arm.joints.length&&i!==sel){sel=i;paintSel();refreshPoseUI();refreshHud();renderBuild();}}
+    if(!e.shiftKey)selKeys.clear();
+    dsDrag={mode:'scrub'};setTime(snapT(x2t(p.x)));return;}
+  if(p.x<LBL){const i=Math.floor((p.y-RULER)/RH);if(i>=0&&i<arm.joints.length)selectJoint(i);return;}
+  const hit=keyAt(p.x,p.y);
+  if(hit){
+    if(!e.shiftKey&&!selKeys.has(hit.k))selKeys.clear();
+    if(e.shiftKey&&selKeys.has(hit.k))selKeys.delete(hit.k);else selKeys.add(hit.k);
+    if(hit.i!==sel){sel=hit.i;paintSel();refreshPoseUI();refreshHud();renderBuild();}
+    dsDrag={mode:'keys',x0:p.x,orig:new Map([...selKeys].map(k=>[k,k.t]))};drawDS();
+  }
+});
+dsC.addEventListener('pointermove',e=>{
+  if(!dsDrag)return;const p=dsPos(e);
+  if(dsDrag.mode==='scrub')setTime(snapT(x2t(p.x)));
+  else{const dt=snapT(x2t(p.x))-snapT(x2t(dsDrag.x0));
+    dsDrag.orig.forEach((t0,k)=>{k.t=clamp(snapT(t0+dt),0,tl.len);});drawDS();}
+});
+function dsUp(){
+  if(dsDrag&&dsDrag.mode==='keys'){keys.forEach(k=>k.sort((a,b)=>a.t-b.t));applyTimeline();markDirty();}
+  dsDrag=null;
+}
+dsC.addEventListener('pointerup',dsUp);dsC.addEventListener('pointercancel',dsUp);
+dsC.addEventListener('dblclick',e=>{
+  const p=dsPos(e);if(p.x<LBL||p.y<RULER)return;const i=Math.floor((p.y-RULER)/RH);if(i<0||i>=arm.joints.length)return;
+  const t=snapT(x2t(p.x));const v=sampleJoint(i,t);insertKey(i,t,v===null?q[i]:v);
+});
+function deleteSelKeys(){
+  if(!selKeys.size){toast('Select a key first (click a diamond).');return;}
+  keys.forEach((k,i)=>{keys[i]=k.filter(x=>!selKeys.has(x));});selKeys.clear();
+  refreshPoseUI();refreshHud();drawDS();markDirty();
+}
+window.addEventListener('keydown',e=>{
+  const tag=(e.target.tagName||'').toLowerCase();
+  if(tag==='input'&&e.target.type!=='range'&&e.target.type!=='checkbox'||tag==='textarea'||tag==='select')return;
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  if(e.key==='k'||e.key==='K'){e.preventDefault();e.shiftKey?insertKey(sel):keyAll();}
+  else if(e.key===' '&&tag!=='button'){e.preventDefault();$('#tPlay').click();}
+  else if(e.key==='ArrowRight'){setTime(tl.t+1/tl.fps);}
+  else if(e.key==='ArrowLeft'){setTime(tl.t-1/tl.fps);}
+  else if(e.key==='Delete'||e.key==='Backspace'){deleteSelKeys();}
+});
+
+/* ================= view bar, tabs, theme ================= */
+$$('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+$('#btnTrail').addEventListener('click',e=>{trailOn=!trailOn;e.currentTarget.classList.toggle('on',trailOn);trailClear();});
+$('#btnGrid').addEventListener('click',e=>{gridOn=!gridOn;e.currentTarget.classList.toggle('on',gridOn);grid.visible=gridOn;need();});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{buildGrid();drawDS();});
+new MutationObserver(()=>{buildGrid();drawDS();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+$('#btnHelp').addEventListener('click',()=>$('#dlgHelp').showModal());
+
+/* ================= autosave ================= */
+let saveT=0;
+function markDirty(){clearTimeout(saveT);saveT=setTimeout(saveProject,700);}
+function projectObj(){
+  return {app:'armature',v:1,presetId,arm,keys,tl:{len:tl.len,interp:tl.interp,loop:tl.loop},
+    ik:{damp:ikS.damp,step:ikS.step,iters:ikS.iters,tol:ikS.tol,limits:ikS.limits,ow:ikS.ow},
+    fw:{board:$('#fwBoard').value,iface:$('#fwIface').value,ssid:$('#fwSsid').value},
+    scripts,curScript};
+}
+function saveProject(){try{store.set('armature.project',JSON.stringify(projectObj()));}catch(e){}}
+function applyProject(p){
+  if(!p||p.app!=='armature'||!p.arm||!Array.isArray(p.arm.joints)||!p.arm.joints.length)throw new Error('This is not an Armature project file.');
+  p.arm.joints.forEach(j=>{j.off=(j.off||[0,0,0]).map(Number);j.motor=Object.assign({type:'servo',a:2,b:-1,en:-1,scale:1,center:90,inv:false,speed:90,accel:300},j.motor||{});j.ik=j.ik!==false;});
+  p.arm.tool=(p.arm.tool||[0,0,5]).map(Number);
+  presetId=PRESETS[p.presetId]?p.presetId:'custom';$('#preset').value=presetId;
+  keys=p.arm.joints.map((_,i)=>((p.keys&&p.keys[i])||[]).map(k=>({t:+k.t,v:+k.v})));
+  if(p.tl){tl.len=p.tl.len||5;tl.interp=p.tl.interp||'smooth';tl.loop=p.tl.loop!==false;}
+  $('#tLen').value=tl.len;$('#tInterp').value=tl.interp;$('#tLoop').checked=tl.loop;
+  if(p.ik){Object.assign(ikS,{damp:p.ik.damp,step:p.ik.step,iters:p.ik.iters,tol:p.ik.tol,limits:p.ik.limits!==false,ow:p.ik.ow||3});
+    $('#ikDamp').value=ikS.damp;$('#ikDampV').textContent=ikS.damp;$('#ikStep').value=ikS.step;$('#ikStepV').textContent=ikS.step;$('#ikIter').value=ikS.iters;$('#ikTol').value=+(ikS.tol*10).toFixed(2);$('#ikLimits').checked=ikS.limits;$('#ikOW').value=ikS.ow;$('#ikOWV').textContent=ikS.ow;}
+  if(p.fw){if(BOARDS[p.fw.board])$('#fwBoard').value=p.fw.board;if(p.fw.iface)$('#fwIface').value=p.fw.iface;$('#fwSsid').value=p.fw.ssid||'';}
+  if(Array.isArray(p.scripts)&&p.scripts.length)scripts=p.scripts.map(s=>({name:String((s&&s.name)||'Untitled'),code:String((s&&s.code)||'')}));
+  else scripts=DEFAULT_SCRIPTS.map(s=>({name:s.name,code:s.code}));
+  curScript=clamp(Number.isInteger(p.curScript)?p.curScript:0,0,scripts.length-1);
+  sel=0;selKeys.clear();tl.t=0;timeCode();trailClear();
+  loadArm(p.arm,true);
+}
+
+/* ================= board link (serial / websocket / virtual) ================= */
+let transport=null;const waiters=[];
+function logSer(kind,text){
+  const box=$('#serLog');const d=h('div',{class:kind,text:(kind==='tx'?'→ ':kind==='rx'?'← ':'')+text});
+  box.append(d);while(box.children.length>400)box.firstChild.remove();box.scrollTop=box.scrollHeight;
+}
+function setStatus(ok,text){
+  board.connected=ok;$('#status').classList.toggle('ok',ok);$('#statusTxt').textContent=text;
+  $('#btnConnect').textContent=ok?'Disconnect':'Connect';$('#serConnect').textContent=ok?'Disconnect':'Connect';
+}
+function onLine(line){
+  logSer('rx',line);
+  while(waiters.length)waiters.shift()(line);
+}
+function nextLine(ms){return new Promise(res=>{const t=setTimeout(()=>{const k=waiters.indexOf(fn);if(k>=0)waiters.splice(k,1);res(null);},ms);const fn=l=>{clearTimeout(t);res(l);};waiters.push(fn);});}
+function sendLine(s){
+  if(!board.connected||!transport)return false;
+  logSer('tx',s);transport.write(s+'\n').catch(e=>logSer('err',String(e.message||e)));return true;
+}
+let sendTimer=0,lastSent=0;
+function queueSend(){
+  if(!board.live||!board.connected||sendTimer)return;
+  const wait=Math.max(0,33-(performance.now()-lastSent));
+  sendTimer=setTimeout(()=>{sendTimer=0;lastSent=performance.now();sendLine('A '+q.map(f2).join(','));},wait);
+}
+async function requestPose(ms=1500){
+  if(!board.connected)throw new Error('No board connected. Open the Serial tab and connect first.');
+  sendLine('R');const end=performance.now()+ms;
+  while(performance.now()<end){
+    const l=await nextLine(Math.max(50,end-performance.now()));
+    if(l&&l.startsWith('P ')){const v=l.slice(2).split(',').map(Number);if(v.length&&v.every(Number.isFinite))return v;}
+  }
+  return null;
+}
+async function connectSerial(baud){
+  if(!('serial' in navigator))throw new Error('Web Serial is not available in this view. Use Chrome or Edge on desktop, and open the app in its own tab if it is embedded.');
+  const port=await navigator.serial.requestPort();await port.open({baudRate:baud});
+  const writer=port.writable.getWriter(),enc=new TextEncoder();
+  const dec=new TextDecoderStream();const closed=port.readable.pipeTo(dec.writable).catch(()=>{});const reader=dec.readable.getReader();
+  let alive=true,buf='';
+  (async()=>{
+    try{while(alive){const {value,done}=await reader.read();if(done)break;buf+=value;let k;
+      while((k=buf.search(/\r?\n/))>=0){const line=buf.slice(0,k).trim();buf=buf.slice(k).replace(/^\r?\n/,'');if(line)onLine(line);}}}catch(e){}
+    if(alive&&board.connected){alive=false;disconnected('Connection lost');}
+  })();
+  transport={write:async s=>{await writer.write(enc.encode(s));},close:async()=>{alive=false;
+    try{await reader.cancel();}catch(e){}try{writer.releaseLock();}catch(e){}try{await closed;}catch(e){}try{await port.close();}catch(e){}}};
+}
+function connectWS(url){
+  return new Promise((res,rej)=>{
+    let ws;try{ws=new WebSocket(url);}catch(e){rej(new Error('Bad address: '+url));return;}
+    ws.onopen=()=>{transport={write:async s=>ws.send(s),close:async()=>ws.close()};res();};
+    ws.onmessage=e=>String(e.data).split(/\r?\n/).forEach(l=>{l=l.trim();if(l)onLine(l);});
+    ws.onerror=()=>rej(new Error('Could not open '+url+'. Browsers block ws:// from https pages, so open this app from a local file for Wi-Fi boards, or use USB serial.'));
+    ws.onclose=()=>{if(board.connected)disconnected('Socket closed');};
+  });
+}
+function connectSim(){
+  let vals=q.slice();
+  transport={write:async s=>{setTimeout(()=>{
+    const l=s.trim();
+    if(l[0]==='A')vals=l.slice(1).split(/[ ,]+/).filter(Boolean).map(Number);
+    else if(l[0]==='J'){const p=l.slice(1).split(/[ ,]+/).filter(Boolean).map(Number);if(p.length>=2&&p[0]>=0&&p[0]<vals.length)vals[p[0]]=p[1];}
+    else if(l==='R')onLine('P '+vals.map(f2).join(','));
+    else if(l==='?')onLine('ARM n='+arm.joints.length+' (virtual board)');
+  },12);},close:async()=>{}};
+}
+function disconnected(msg){
+  board.live=false;$('#mirror').checked=false;transport=null;setStatus(false,'Not connected');logSer('sys',msg);toast(msg,true);
+}
+async function toggleConnect(){
+  if(board.connected){
+    const t=transport;board.connected=false;board.live=false;$('#mirror').checked=false;transport=null;
+    try{await t.close();}catch(e){}setStatus(false,'Not connected');logSer('sys','Disconnected');return;
+  }
+  const kind=$('#trKind').value;
+  try{
+    if(kind==='serial')await connectSerial(+$('#baud').value);
+    else if(kind==='ws')await connectWS($('#wsUrl').value.trim());
+    else connectSim();
+    board.kind=kind;
+    setStatus(true,kind==='serial'?'USB · '+$('#baud').value+' baud':kind==='ws'?'Wi-Fi':'Virtual board');
+    logSer('sys','Connected. Mirror is off; switch it on when the arm is powered and clear of obstacles.');
+    if(kind==='serial')setTimeout(()=>sendLine('?'),2000);else sendLine('?');
+  }catch(e){
+    if(e&&e.name==='NotFoundError'){toast('No port selected.');return;}
+    logSer('err',String(e.message||e));toast(String(e.message||e),true);showEditor('ser');
+  }
+}
+$('#btnConnect').addEventListener('click',()=>{if(board.connected)toggleConnect();else{showEditor('ser');toggleConnect();}});
+$('#serConnect').addEventListener('click',toggleConnect);
+$('#trKind').addEventListener('change',e=>{$('#trBaudRow').hidden=e.target.value!=='serial';$('#trUrlRow').hidden=e.target.value!=='ws';});
+$('#mirror').addEventListener('change',e=>{
+  if(e.target.checked&&!board.connected){e.target.checked=false;toast('Connect a board first (Serial tab).',true);showEditor('ser');return;}
+  board.live=e.target.checked;if(board.live){sendLine('A '+q.map(f2).join(','));toast('Mirroring: the real arm follows the simulation');}
+});
+$('#btnSendNow').addEventListener('click',()=>{if(!sendLine('A '+q.map(f2).join(',')))toast('Connect a board first (Serial tab).',true);});
+$('#serSend2').addEventListener('click',()=>$('#btnSendNow').click());
+$('#btnRead').addEventListener('click',async()=>{
+  try{const v=await requestPose();if(!v){toast('The board did not answer. Check the firmware and baud rate.',true);return;}
+    v.forEach((x,i)=>{if(i<arm.joints.length)q[i]=clamp(x,arm.joints[i].min,arm.joints[i].max);});afterPose('read');toast('Pose read from the arm');}
+  catch(e){toast(e.message,true);}
+});
+function sendManual(){const el=$('#serIn');const s=el.value.trim();if(!s)return;if(!sendLine(s))toast('Connect a board first.',true);el.value='';}
+$('#serSend').addEventListener('click',sendManual);
+$('#serIn').addEventListener('keydown',e=>{if(e.key==='Enter')sendManual();});
+$('#serClear').addEventListener('click',()=>{$('#serLog').innerHTML='';});
+
+/* ================= firmware generators ================= */
+const BOARDS={
+  uno:{name:'Arduino Uno R3',fam:'avr',ide:'Arduino Uno',note:'2 KB RAM is fine for up to ~8 joints. Pins 0 and 1 carry the USB serial link.'},
+  nano:{name:'Arduino Nano / Pro Mini (ATmega328P)',fam:'avr',ide:'Arduino Nano (choose the old bootloader for cheap clones)',note:'Same chip as the Uno. Pins A4/A5 are the I²C pins for a PCA9685.'},
+  every:{name:'Arduino Nano Every',fam:'avr',ide:'Arduino Nano Every',note:'Pin-compatible with the classic Nano but a faster ATmega4809. Pins 0 and 1 carry USB serial.'},
+  mega:{name:'Arduino Mega 2560',fam:'avr',ide:'Arduino Mega or Mega 2560',note:'Lots of pins, good for big arms with many steppers.'},
+  leo:{name:'Arduino Leonardo / Micro / Pro Micro',fam:'avr32u4',ide:'Arduino Leonardo (or SparkFun Pro Micro)',note:'USB is native, so the sketch waits up to 3 s for the port to open.'},
+  r4:{name:'Arduino Uno R4 (Minima / WiFi)',fam:'arm',core:'Arduino UNO R4 Boards',ide:'Arduino UNO R4 Minima (or WiFi)',note:'Install the "Arduino UNO R4 Boards" core.'},
+  due:{name:'Arduino Due',fam:'arm',core:'Arduino SAM Boards (32-bits ARM Cortex-M3)',ide:'Arduino Due (Programming Port)',note:'3.3 V logic. Use the Programming Port for upload and serial.'},
+  zero:{name:'Arduino Zero',fam:'arm',core:'Arduino SAMD Boards (32-bits ARM Cortex-M0+)',ide:'Arduino Zero (Native USB Port)',note:'3.3 V logic. Use the Native USB port for upload and serial.'},
+  mkrwifi:{name:'Arduino MKR WiFi 1010',fam:'arm',wifi:true,wifilib:'WiFiNINA',core:'Arduino SAMD Boards (32-bits ARM Cortex-M0+)',ide:'Arduino MKR WiFi 1010',note:'3.3 V logic, low power draw. Good for a battery-powered arm.'},
+  nano33iot:{name:'Arduino Nano 33 IoT',fam:'arm',wifi:true,wifilib:'WiFiNINA',core:'Arduino SAMD Boards (32-bits ARM Cortex-M0+)',ide:'Arduino Nano 33 IoT',note:'3.3 V logic. Same footprint as a classic Nano.'},
+  nano33ble:{name:'Arduino Nano 33 BLE / BLE Sense',fam:'arm',core:'Arduino Mbed OS Nano Boards',ide:'Arduino Nano 33 BLE',note:'3.3 V logic, no Wi-Fi (Bluetooth only, not usable for this app\'s Wi-Fi link option).'},
+  giga:{name:'Arduino GIGA R1 WiFi',fam:'arm',wifi:true,core:'Arduino Mbed OS Giga Boards',ide:'Arduino Giga R1 WiFi',note:'3.3 V logic, plenty of pins and RAM for a large arm.'},
+  esp32:{name:'ESP32 (DevKit, S2, S3, C3)',fam:'esp32',wifi:true,core:'esp32 by Espressif Systems',ide:'ESP32 Dev Module (or your exact board)',note:'3.3 V logic. Avoid GPIO 6–11 (flash) and 34–39 (input only). Servo library: ESP32Servo.'},
+  esp8266:{name:'ESP8266 (NodeMCU, Wemos D1)',fam:'esp8266',wifi:true,core:'esp8266 by ESP8266 Community',ide:'NodeMCU 1.0 (ESP-12E Module)',note:'3.3 V logic and few free pins. Avoid GPIO 6–11; GPIO 0, 2, 15 affect boot.'},
+  pico:{name:'Raspberry Pi Pico / Pico 2',fam:'rp2',core:'Raspberry Pi Pico/RP2040/RP2350 by Earle F. Philhower, III',ide:'Raspberry Pi Pico (or Pico 2)',note:'3.3 V logic. Uses USB serial; pins are GP numbers.'},
+  picow:{name:'Raspberry Pi Pico W / Pico 2 W',fam:'rp2',wifi:true,core:'Raspberry Pi Pico/RP2040/RP2350 by Earle F. Philhower, III',ide:'Raspberry Pi Pico W (or Pico 2 W)',note:'3.3 V logic. Uses USB serial; pins are GP numbers.'},
+  teensy:{name:'Teensy 3.x / 4.x',fam:'arm',core:'Teensyduino (from PJRC)',ide:'Teensy 4.1',note:'Fast enough for many steppers at high step rates. 3.3 V logic.'},
+  stm32:{name:'STM32 (Blue Pill, Nucleo)',fam:'arm',core:'STM32 MCU based boards (STM32duino)',ide:'Generic STM32F1 series (or your Nucleo)',note:'3.3 V logic. Pin names like PA0 must be replaced by numbers or macros in the pin tables.'},
+  pi:{name:'Raspberry Pi 3 / 4 / 5 (Python)',fam:'pi',note:'Runs a Python server on the Pi. Install: pip install gpiozero websockets (plus pigpio and "sudo pigpiod" on Pi 1–4 for smooth servo pulses).'},
+  beaglebone:{name:'BeagleBone Black / AI (Python)',fam:'pi',pylib:'Adafruit_BBIO',note:'Runs the same Python server, but written against gpiozero (a Raspberry Pi library). Swap it for Adafruit_BBIO and use its pin names (e.g. "P9_14") before running.'},
+  orangepi:{name:'Orange Pi (Python)',fam:'pi',pylib:'OPi.GPIO',note:'Runs the same Python server, but written against gpiozero (a Raspberry Pi library). Swap it for OPi.GPIO (set OPi.GPIO.setboard(...) for your model) before running.'},
+  jetson:{name:'NVIDIA Jetson Nano / Orin (Python)',fam:'pi',pylib:'Jetson.GPIO',note:'Runs the same Python server, but written against gpiozero (a Raspberry Pi library). Swap it for Jetson.GPIO before running. Camera tracking can instead run in-browser as usual.'}
+};
+function motorKind(m){return {none:0,servo:1,stepper:2,pca9685:3}[m.type]||0;}
+const fnum=v=>{let s=(+v).toFixed(4).replace(/0+$/,'');if(s.endsWith('.'))s+='0';return s;};
+function genArduino(b,o){
+  const Jn=arm.joints,n=Jn.length,M=Jn.map(j=>j.motor);
+  const has=t=>M.some(m=>m.type===t);
+  const ws=o.iface==='ws'&&b.wifi,esp32=b.fam==='esp32';
+  const A=fn=>'{'+Jn.map((j,i)=>fn(j,M[i],i)).join(', ')+'}';
+  const L=[];
+  L.push('// '+arm.name+': '+n+' joints on '+b.name,
+    '// Generated by Armature (open source). One text command per line at '+o.baud+' baud:',
+    '//   A v0,v1,...,v'+(n-1)+'   move every joint       J i v   move joint i (0-based)',
+    '//   R                    reply "P v0,v1,..."    ?       reply "ARM n='+n+'"',
+    '// Units: degrees (revolute), centimetres (prismatic), 0-100 (gripper).',
+    '// Joints: '+Jn.map((j,i)=>i+'='+j.name).join(', '),'');
+  if(has('servo'))L.push(esp32?'#include <ESP32Servo.h>      // Library Manager: "ESP32Servo"':'#include <Servo.h>');
+  if(has('stepper'))L.push('#include <AccelStepper.h>    // Library Manager: "AccelStepper" by Mike McCauley');
+  if(has('pca9685'))L.push('#include <Wire.h>','#include <Adafruit_PWMServoDriver.h>   // Library Manager: "Adafruit PWM Servo Driver Library"');
+  if(ws)L.push(b.fam==='esp8266'?'#include <ESP8266WiFi.h>':b.wifilib==='WiFiNINA'?'#include <WiFiNINA.h>       // Library Manager: "WiFiNINA"':'#include <WiFi.h>','#include <WebSocketsServer.h>   // Library Manager: "WebSockets" by Markus Sattler');
+  L.push('');
+  if(ws)L.push('const char* WIFI_SSID = "'+(o.ssid||'your-wifi-name').replace(/"/g,'')+'";','const char* WIFI_PASS = "'+(o.pass||'your-password').replace(/"/g,'')+'";','WebSocketsServer wsServer(81);   // browser connects to ws://<board-ip>:81','');
+  L.push('const long BAUD = '+o.baud+';','const int N = '+n+';','',
+    '// kind: 0 unused, 1 hobby servo, 2 stepper (STEP/DIR driver), 3 servo on a PCA9685 channel',
+    'const uint8_t KIND[N]   = '+A((j,m)=>motorKind(m))+';',
+    'const int16_t PIN_A[N]  = '+A((j,m)=>m.a)+';   // servo pin | STEP pin | PCA9685 channel',
+    'const int16_t PIN_B[N]  = '+A((j,m)=>m.b)+';   // DIR pin (steppers)',
+    'const int16_t PIN_EN[N] = '+A((j,m)=>m.en)+';   // ENABLE pin, -1 = none (most drivers enable on LOW)',
+    'const float MIN_V[N]    = '+A(j=>fnum(j.min))+';',
+    'const float MAX_V[N]    = '+A(j=>fnum(j.max))+';',
+    'const float HOME_V[N]   = '+A(j=>fnum(j.home))+';',
+    'const float DIRV[N]     = '+A((j,m)=>m.inv?'-1.0':'1.0')+';',
+    'const float SCALE[N]    = '+A((j,m)=>fnum(m.scale))+';   // servo: degrees per unit | stepper: steps per unit',
+    'const float CENTER[N]   = '+A((j,m)=>fnum(m.center))+';   // servo angle at value 0',
+    'const float SPEED[N]    = '+A((j,m)=>fnum(m.speed))+';   // stepper units per second',
+    'const float ACCEL[N]    = '+A((j,m)=>fnum(m.accel))+';   // stepper units per second^2','');
+  if(has('servo'))L.push('Servo servos[N];');
+  if(has('stepper'))L.push('AccelStepper* steppers[N];');
+  if(has('pca9685'))L.push('Adafruit_PWMServoDriver pca(0x40);');
+  L.push('float posV[N];','');
+  if(has('servo')||has('pca9685'))L.push('int angleToUs(float a) {','  a = constrain(a, 0, 180);','  return 500 + (int)(a * (1900.0 / 180.0));   // 500-2400 us','}','');
+  L.push('void applyJoint(int i, float v) {','  if (i < 0 || i >= N) return;','  v = constrain(v, MIN_V[i], MAX_V[i]);','  posV[i] = v;','  switch (KIND[i]) {');
+  if(has('servo'))L.push('    case 1: servos[i].writeMicroseconds(angleToUs(CENTER[i] + DIRV[i] * v * SCALE[i])); break;');
+  if(has('stepper'))L.push('    case 2: steppers[i]->moveTo((long)(v * DIRV[i] * SCALE[i])); break;');
+  if(has('pca9685'))L.push('    case 3: pca.writeMicroseconds(PIN_A[i], angleToUs(CENTER[i] + DIRV[i] * v * SCALE[i])); break;');
+  L.push('    default: break;','  }','}','');
+  L.push('// Servos have no feedback: they report the last commanded value.'+(has('stepper')?' Steppers report their step counter.':''),'float currentValue(int i) {');
+  if(has('stepper'))L.push('  if (KIND[i] == 2) return steppers[i]->currentPosition() / (DIRV[i] * SCALE[i]);');
+  L.push('  return posV[i];','}','');
+  L.push('void emit(String s) {','  Serial.println(s);');
+  if(ws)L.push('  wsServer.broadcastTXT(s);');
+  L.push('}','','void sendPose() {','  String s = "P ";','  for (int i = 0; i < N; i++) { if (i) s += ","; s += String(currentValue(i), 2); }','  emit(s);','}','',
+    'void handleLine(char* s) {',
+    '  if (s[0] == \'A\') {','    char* p = strtok(s + 1, ", ");','    for (int i = 0; p && i < N; i++) { applyJoint(i, atof(p)); p = strtok(NULL, ", "); }',
+    '  } else if (s[0] == \'J\') {','    char* a = strtok(s + 1, ", ");','    char* v = strtok(NULL, ", ");','    if (a && v) applyJoint(atoi(a), atof(v));',
+    '  } else if (s[0] == \'R\') {','    sendPose();','  } else if (s[0] == \'?\') {','    emit("ARM n=" + String(N));','  }','}','');
+  if(ws)L.push('void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t len) {','  if (type != WStype_TEXT) return;','  char buf[160];','  size_t l = len < sizeof(buf) - 1 ? len : sizeof(buf) - 1;','  memcpy(buf, payload, l);','  buf[l] = 0;','  handleLine(buf);','}','');
+  L.push('void setup() {','  Serial.begin(BAUD);');
+  if(b.fam==='avr32u4')L.push('  while (!Serial && millis() < 3000) {}');
+  if(esp32&&has('servo'))L.push('  ESP32PWM::allocateTimer(0); ESP32PWM::allocateTimer(1); ESP32PWM::allocateTimer(2); ESP32PWM::allocateTimer(3);');
+  if(has('pca9685'))L.push('  Wire.begin();','  pca.begin();','  pca.setPWMFreq(50);');
+  L.push('  for (int i = 0; i < N; i++) {','    switch (KIND[i]) {');
+  if(has('servo'))L.push('      case 1: servos[i].attach(PIN_A[i], 500, 2400); break;');
+  if(has('stepper'))L.push('      case 2:','        steppers[i] = new AccelStepper(AccelStepper::DRIVER, PIN_A[i], PIN_B[i]);','        steppers[i]->setMaxSpeed(SPEED[i] * SCALE[i]);','        steppers[i]->setAcceleration(ACCEL[i] * SCALE[i]);','        steppers[i]->setCurrentPosition((long)(HOME_V[i] * DIRV[i] * SCALE[i]));','        if (PIN_EN[i] >= 0) { pinMode(PIN_EN[i], OUTPUT); digitalWrite(PIN_EN[i], LOW); }','        break;');
+  L.push('      default: break;','    }','    applyJoint(i, HOME_V[i]);','  }');
+  if(ws)L.push('  WiFi.begin(WIFI_SSID, WIFI_PASS);','  while (WiFi.status() != WL_CONNECTED) delay(250);','  Serial.print("IP ");','  Serial.println(WiFi.localIP());','  wsServer.begin();','  wsServer.onEvent(onWsEvent);');
+  L.push('  emit("ARM READY n=" + String(N));','}','','char lineBuf[160];','int lineLen = 0;','',
+    'void loop() {','  while (Serial.available()) {','    char c = Serial.read();','    if (c == \'\\n\' || c == \'\\r\') {','      if (lineLen) { lineBuf[lineLen] = 0; handleLine(lineBuf); lineLen = 0; }','    } else if (lineLen < (int)sizeof(lineBuf) - 1) {','      lineBuf[lineLen++] = c;','    }','  }');
+  if(ws)L.push('  wsServer.loop();');
+  if(has('stepper'))L.push('  for (int i = 0; i < N; i++) if (KIND[i] == 2) steppers[i]->run();');
+  L.push('}');
+  return L.join('\n');
+}
+function genPi(b,o){
+  const Jn=arm.joints;
+  const cfg=Jn.map(j=>{const m=j.motor;return '  {"name": "'+j.name.replace(/"/g,'')+'", "kind": "'+m.type+'", "a": '+m.a+', "b": '+m.b+', "min": '+fnum(j.min)+', "max": '+fnum(j.max)+', "home": '+fnum(j.home)+', "dir": '+(m.inv?'-1':'1')+', "scale": '+fnum(m.scale)+', "center": '+fnum(m.center)+', "speed": '+fnum(m.speed)+'},';}).join('\n');
+  return `#!/usr/bin/env python3
+# ${arm.name}: ${b.name} arm server, generated by Armature (open source).
+${b.pylib?'# NOTE: this template is written against gpiozero (a Raspberry Pi library). On this board, swap the\n# gpiozero import and pin objects below for '+b.pylib+' before running — the JOINTS table, the\n# websockets server and the A/J/R/? text protocol below all stay the same.\n':''}# Install:  pip install gpiozero websockets     (Pi 1-4 also: pip install pigpio ; sudo pigpiod)
+# Same text protocol as the microcontroller firmware, over WebSocket on port 8765:
+#   A v0,v1,...   move all joints    J i v   move joint i    R   reply "P v0,v1,..."    ?   handshake
+import asyncio, threading, time
+from gpiozero import AngularServo, OutputDevice
+import websockets
+try:
+    from gpiozero.pins.pigpio import PiGPIOFactory
+    FACTORY = PiGPIOFactory()          # hardware-timed servo pulses (needs pigpiod)
+except Exception:
+    FACTORY = None                     # default pins: software PWM, slightly jittery servos
+
+JOINTS = [
+${cfg}
+]
+N = len(JOINTS)
+
+class Stepper(threading.Thread):
+    def __init__(self, c):
+        super().__init__(daemon=True)
+        self.c = c
+        self.step = OutputDevice(c["a"], pin_factory=FACTORY)
+        self.dir = OutputDevice(c["b"], pin_factory=FACTORY)
+        self.pos = int(c["home"] * c["dir"] * c["scale"])
+        self.target = self.pos
+        self.sps = max(1.0, c["speed"] * c["scale"])      # steps per second (Python timing limits this to a few kHz)
+        self.start()
+    def run(self):
+        d = 0.5 / self.sps
+        while True:
+            if self.pos == self.target:
+                time.sleep(0.002); continue
+            fwd = self.target > self.pos
+            self.dir.value = 1 if fwd else 0
+            self.step.on(); time.sleep(d); self.step.off(); time.sleep(d)
+            self.pos += 1 if fwd else -1
+    def move(self, v): self.target = int(v * self.c["dir"] * self.c["scale"])
+    def value(self): return self.pos / (self.c["dir"] * self.c["scale"])
+
+class Servo:
+    def __init__(self, c):
+        self.c, self.v = c, c["home"]
+        self.dev = AngularServo(c["a"], min_angle=0, max_angle=180, min_pulse_width=0.0005, max_pulse_width=0.0024, pin_factory=FACTORY)
+        self.move(c["home"])
+    def move(self, v):
+        c = self.c
+        self.v = v
+        self.dev.angle = max(0, min(180, c["center"] + c["dir"] * v * c["scale"]))
+    def value(self): return self.v
+
+motors = []
+for c in JOINTS:
+    if c["kind"] == "stepper": motors.append(Stepper(c))
+    elif c["kind"] == "servo": motors.append(Servo(c))
+    else: motors.append(None)   # PCA9685 / virtual joints: add your own driver here
+
+def apply(i, v):
+    if 0 <= i < N and motors[i]:
+        c = JOINTS[i]
+        motors[i].move(max(c["min"], min(c["max"], v)))
+
+def handle(line):
+    line = line.strip()
+    if not line: return None
+    cmd, rest = line[0], line[1:].replace(",", " ").split()
+    if cmd == "A":
+        for i, v in enumerate(rest[:N]): apply(i, float(v))
+    elif cmd == "J" and len(rest) >= 2: apply(int(rest[0]), float(rest[1]))
+    elif cmd == "R": return "P " + ",".join(f"{m.value():.2f}" if m else "0.00" for m in motors)
+    elif cmd == "?": return f"ARM n={N}"
+    return None
+
+async def serve(ws):
+    async for msg in ws:
+        for ln in str(msg).splitlines():
+            r = handle(ln)
+            if r: await ws.send(r)
+
+async def main():
+    async with websockets.serve(serve, "0.0.0.0", 8765):
+        print("Arm server on ws://<pi-address>:8765")
+        await asyncio.Future()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+`;
+}
+function pinWarnings(b){
+  const w=[],used=new Map();
+  arm.joints.forEach(j=>{
+    const m=j.motor,pins=[];
+    if(m.type==='servo')pins.push(['signal',m.a]);
+    if(m.type==='stepper'){pins.push(['STEP',m.a],['DIR',m.b]);if(m.en>=0)pins.push(['ENABLE',m.en]);}
+    if(m.type==='pca9685'&&(m.a<0||m.a>15))w.push(j.name+': PCA9685 channel must be 0 to 15.');
+    pins.forEach(([lb,p])=>{
+      if(p<0){w.push(j.name+': '+lb+' pin is not set.');return;}
+      if(used.has(p))w.push('Pin '+p+' is used by both '+used.get(p)+' and '+j.name+'.');else used.set(p,j.name);
+      if((b.fam==='avr'||b.fam==='avr32u4')&&p<2&&b.fam==='avr')w.push(j.name+': pins 0 and 1 are the USB serial pins on this board.');
+      if(b.fam==='esp32'&&p>=6&&p<=11)w.push(j.name+': GPIO '+p+' is connected to flash on ESP32 boards.');
+      if(b.fam==='esp32'&&p>=34&&p<=39)w.push(j.name+': GPIO '+p+' is input-only on ESP32.');
+      if(b.fam==='esp8266'&&p>=6&&p<=11)w.push(j.name+': GPIO '+p+' is connected to flash on ESP8266 boards.');
+    });
+  });
+  return w;
+}
+let fwLast='';
+function fwOpts(){return {iface:$('#fwIface').value,ssid:$('#fwSsid').value,pass:$('#fwPass').value,baud:+$('#baud').value};}
+function regenFw(){
+  if(!arm)return;
+  const id=$('#fwBoard').value,b=BOARDS[id];if(!b)return;
+  $('#fwIfaceRow').hidden=!b.wifi;$('#fwWifi').hidden=!(b.wifi&&$('#fwIface').value==='ws');
+  const code=b.fam==='pi'?genPi(b,fwOpts()):genArduino(b,fwOpts());
+  const ta=$('#fwCode');
+  if(ta.value===fwLast||!ta.value.trim()||ta.dataset.dirty!=='1'){ta.value=code;ta.dataset.dirty='0';}
+  fwLast=code;
+  const libs=[];const has=t=>arm.joints.some(j=>j.motor.type===t);
+  if(b.fam!=='pi'){if(has('servo'))libs.push(b.fam==='esp32'?'ESP32Servo':'Servo (built in)');if(has('stepper'))libs.push('AccelStepper');if(has('pca9685'))libs.push('Adafruit PWM Servo Driver');if(b.wifi&&$('#fwIface').value==='ws')libs.push('WebSockets');}
+  $('#fwNotes').textContent=(b.note||'')+(b.ide?'  Arduino IDE board: '+b.ide+'.':'')+(b.core?'  Core: '+b.core+'.':'')+(libs.length?'  Libraries: '+libs.join(', ')+'.':'');
+  const tb=h('table',null,h('tr',null,h('th',{text:'Joint'}),h('th',{text:'Motor'}),h('th',{text:'Pins'})));
+  arm.joints.forEach(j=>{const m=j.motor;
+    const pins=m.type==='servo'?'sig '+m.a:m.type==='pca9685'?'ch '+m.a:m.type==='stepper'?'step '+m.a+' dir '+m.b+(m.en>=0?' en '+m.en:''):'-';
+    tb.append(h('tr',null,h('td',{text:j.name}),h('td',{text:m.type}),h('td',{class:'mono',text:pins})));});
+  $('#fwWiring').replaceChildren(tb);
+  const warns=pinWarnings(b);
+  if(b.wifi&&$('#fwIface').value==='ws'&&b.fam!=='esp32'&&b.fam!=='esp8266')
+    warns.push('The "WebSockets" library\u2019s support for this board\u2019s Wi-Fi stack varies by library version — if it won\u2019t compile, use USB serial instead.');
+  $('#fwWarn').replaceChildren(...warns.map(t=>h('div',{class:'warn',text:'⚠ '+t})));
+}
+$('#fwBoard').append(...Object.keys(BOARDS).map(id=>h('option',{value:id,text:BOARDS[id].name})));
+['fwBoard','fwIface','fwSsid','fwPass','baud'].forEach(id=>$('#'+id).addEventListener('change',()=>{$('#fwCode').dataset.dirty='0';regenFw();markDirty();}));
+$('#fwCode').addEventListener('input',e=>{e.target.dataset.dirty='1';});
+$('#fwCopy').addEventListener('click',()=>copyText($('#fwCode').value));
+$('#fwSave').addEventListener('click',()=>saveFile(($('#fwBoard').value==='pi'?'arm_server.py':'arm_firmware.ino')+'.txt',$('#fwCode').value));
+
+/* ================= workspaces and dockable areas ================= */
+const EDITORS={
+  viewport:{label:'3D Viewport',el:'#viewwrap'},
+  timeline:{label:'Timeline',el:'#timeline'},
+  joints:{label:'Joints',el:'#ed-joints'},
+  props:{label:'Properties',el:'#ed-props'},
+  script:{label:'Python Script',el:'#ed-script'},
+  ser:{label:'Serial',el:'#ed-ser'},
+  fw:{label:'Firmware',el:'#ed-fw'},
+  cam:{label:'Camera',el:'#ed-cam'},
+  calib:{label:'Calibration',el:'#ed-calib'},
+  pick:{label:'Pick & Place',el:'#ed-pick'}
+};
+const Lf=ed=>({ed}),Sp=(t,r,a,b)=>({t,r,a,b});
+const WS_LABEL={layout:'Layout',animation:'Animation',hardware:'Hardware',scripting:'Scripting',vision:'Vision'};
+const WS_DEFAULT={
+  layout:()=>Sp('row',.19,Sp('col',.5,Lf('joints'),Lf('ser')),Sp('row',.72,Sp('col',.64,Lf('viewport'),Sp('row',.6,Lf('timeline'),Lf('script'))),Lf('props'))),
+  animation:()=>Sp('row',.2,Sp('col',.55,Lf('joints'),Lf('props')),Sp('col',.5,Lf('viewport'),Lf('timeline'))),
+  hardware:()=>Sp('row',.22,Lf('props'),Sp('row',.68,Lf('fw'),Sp('col',.5,Lf('viewport'),Lf('ser')))),
+  scripting:()=>Sp('row',.26,Sp('col',.5,Lf('viewport'),Lf('joints')),Lf('script')),
+  vision:()=>Sp('row',.34,Lf('cam'),Sp('row',.5,Sp('col',.5,Lf('calib'),Lf('pick')),Sp('col',.55,Lf('viewport'),Lf('timeline'))))
+};
+let wsName='layout',trees={};
+const curTree=()=>trees[wsName];
+function leaves(n,acc=[]){if(n.ed)acc.push(n);else{leaves(n.a,acc);leaves(n.b,acc);}return acc;}
+function findParent(root,target){
+  if(root.ed)return null;
+  if(root.a===target||root.b===target)return root;
+  return findParent(root.a,target)||findParent(root.b,target);
+}
+function validTree(n){
+  if(!n||typeof n!=='object')return false;
+  if(n.ed)return !!EDITORS[n.ed];
+  return (n.t==='row'||n.t==='col')&&typeof n.r==='number'&&n.r>0&&n.r<1&&validTree(n.a)&&validTree(n.b);
+}
+function saveLayout(){store.set('armature.layout',JSON.stringify({ws:wsName,trees}));}
+function unusedEditor(){const used=new Set(leaves(curTree()).map(l=>l.ed));return Object.keys(EDITORS).find(k=>!used.has(k))||'script';}
+function setEditor(leaf,name){
+  if(leaf.ed===name)return;
+  const other=leaves(curTree()).find(l=>l!==leaf&&l.ed===name);
+  if(other)other.ed=leaf.ed;
+  leaf.ed=name;renderLayout();
+}
+function splitLeaf(n,t){const ne=unusedEditor(),old={ed:n.ed};delete n.ed;n.t=t;n.r=.5;n.a=old;n.b={ed:ne};renderLayout();}
+function closeLeaf(n){
+  const p=findParent(curTree(),n);if(!p)return;
+  const sib=p.a===n?p.b:p.a;
+  Object.keys(p).forEach(k=>delete p[k]);Object.assign(p,sib);renderLayout();
+}
+function flashLeaf(leaf){
+  const a=$$('#areas .area').find(x=>x._leaf===leaf);
+  if(a){a.classList.add('flash');setTimeout(()=>a.classList.remove('flash'),900);}
+}
+function showEditor(name){
+  const ls=leaves(curTree());
+  const hit=ls.find(l=>l.ed===name);
+  if(hit){flashLeaf(hit);return;}
+  const cand=ls.filter(l=>l.ed!=='viewport'&&l.ed!=='timeline');
+  setEditor(cand.length?cand[cand.length-1]:ls[ls.length-1],name);
+  flashLeaf(leaves(curTree()).find(l=>l.ed===name));
+}
+function startGutter(e,g,el,n,a,b){
+  e.preventDefault();g.setPointerCapture(e.pointerId);g.classList.add('drag');
+  const row=n.t==='row';
+  const move=ev=>{
+    const r=el.getBoundingClientRect();
+    n.r=clamp(row?(ev.clientX-r.left)/r.width:(ev.clientY-r.top)/r.height,.07,.93);
+    a.style.flexGrow=n.r;b.style.flexGrow=1-n.r;
+  };
+  const up=()=>{g.classList.remove('drag');g.removeEventListener('pointermove',move);g.removeEventListener('pointerup',up);g.removeEventListener('pointercancel',up);saveLayout();need();};
+  g.addEventListener('pointermove',move);g.addEventListener('pointerup',up);g.addEventListener('pointercancel',up);
+}
+function buildLeaf(n){
+  const area=h('div',{class:'area','data-ed':n.ed});
+  const label=h('span',{class:'ah-label',text:EDITORS[n.ed].label});
+  const head=h('div',{class:'ah'},label,h('span',{class:'ttl'}),
+    h('button',{class:'split-btn',title:'Split side by side','aria-label':'Split side by side',text:'↔',onclick:()=>splitLeaf(n,'row')}),
+    h('button',{class:'split-btn',title:'Split top and bottom','aria-label':'Split top and bottom',text:'↕',onclick:()=>splitLeaf(n,'col')}),
+    h('button',{class:'split-btn',title:'Close area','aria-label':'Close area',text:'✕',disabled:!findParent(curTree(),n),onclick:()=>closeLeaf(n)}));
+  const body=h('div',{class:'ab'});body.append($(EDITORS[n.ed].el));
+  area.append(head,body);area._leaf=n;return area;
+}
+function buildNode(n){
+  if(n.ed)return buildLeaf(n);
+  const el=h('div',{class:'split s-'+n.t});
+  const a=buildNode(n.a),b=buildNode(n.b);
+  a.style.flexGrow=n.r;b.style.flexGrow=1-n.r;
+  const g=h('div',{class:'gutter',role:'separator','aria-orientation':n.t==='row'?'vertical':'horizontal'});
+  g.addEventListener('pointerdown',e=>startGutter(e,g,el,n,a,b));
+  el.append(a,g,b);return el;
+}
+function renderLayout(){
+  const stash=$('#stash');
+  Object.values(EDITORS).forEach(e=>stash.append($(e.el)));
+  $('#areas').replaceChildren(buildNode(curTree()));
+  $$('#wsTabs button').forEach(b=>b.classList.toggle('on',b.dataset.ws===wsName));
+  need();resize();dsResize();regenFw();saveLayout();
+}
+function switchWorkspace(name){
+  wsName=name;if(!trees[name]||!validTree(trees[name]))trees[name]=WS_DEFAULT[name]();
+  renderLayout();
+}
+function initLayout(){
+  $('#wsTabs').replaceChildren(...Object.keys(WS_LABEL).map(k=>h('button',{'data-ws':k,text:WS_LABEL[k],onclick:()=>switchWorkspace(k)})));
+  let saved=null;try{saved=JSON.parse(store.get('armature.layout')||'null');}catch(e){}
+  Object.keys(WS_LABEL).forEach(k=>{trees[k]=saved&&saved.trees&&validTree(saved.trees[k])?saved.trees[k]:WS_DEFAULT[k]();});
+  wsName=saved&&WS_LABEL[saved.ws]?saved.ws:'layout';
+  renderLayout();
+}
+/* ---- File menu ---- */
+const fileMenu=$('#fileMenu'),btnFile=$('#btnFile');
+function toggleMenu(open){fileMenu.hidden=!open;btnFile.setAttribute('aria-expanded',String(open));}
+btnFile.addEventListener('click',e=>{e.stopPropagation();toggleMenu(fileMenu.hidden);});
+document.addEventListener('click',e=>{if(!fileMenu.hidden&&!fileMenu.contains(e.target))toggleMenu(false);});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!fileMenu.hidden)toggleMenu(false);});
+fileMenu.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-fm]');if(!b)return;toggleMenu(false);
+  const a=b.dataset.fm;
+  if(a==='save')saveFile('armature_project.json',JSON.stringify(projectObj(),null,1));
+  else if(a==='load')$('#expFile').click();
+  else if(a==='reset'){trees[wsName]=WS_DEFAULT[wsName]();renderLayout();toast('Layout reset');}
+  else if(a==='guide')$('#dlgHelp').showModal();
+  else if(a==='tour')startTour();
+  else if(a==='about')$('#dlgAbout').showModal();
+});
+
+/* ================= first-use guided tour + About ================= */
+const TD_ORBIT='<svg viewBox="0 0 240 84"><circle cx="120" cy="42" r="26" fill="none" stroke="var(--accent)" stroke-width="2" style="transform-origin:120px 42px;animation:tdOrbit 2.4s linear infinite"/><rect x="105" y="27" width="30" height="30" rx="4" fill="none" stroke="var(--text)" stroke-width="2" style="transform-origin:120px 42px;animation:tdOrbit 7s linear infinite"/><circle cx="146" cy="42" r="5" fill="var(--accent2)" style="transform-origin:120px 42px;animation:tdOrbit 2.4s linear infinite"/></svg>';
+const TD_SLIDER='<svg viewBox="0 0 240 84"><line x1="30" y1="42" x2="210" y2="42" stroke="var(--line)" stroke-width="4" stroke-linecap="round"/><circle cx="30" cy="42" r="9" fill="var(--accent)" style="animation:tdSlide 2.2s ease-in-out infinite"/></svg>';
+const TD_KEYS='<svg viewBox="0 0 240 84"><line x1="20" y1="54" x2="220" y2="54" stroke="var(--line)" stroke-width="3"/><rect x="60" y="48" width="12" height="12" fill="var(--accent)" transform="rotate(45 66 54)" style="animation:tdPop 2.4s ease infinite"/><rect x="150" y="48" width="12" height="12" fill="var(--accent)" transform="rotate(45 156 54)" style="animation:tdPop 2.4s ease infinite .3s"/><line x1="20" y1="20" x2="20" y2="70" stroke="var(--accent2)" stroke-width="2" style="animation:tdSweepLine 2.4s ease-in-out infinite"/></svg>';
+const TD_SCRIPT='<svg viewBox="0 0 240 84"><rect x="30" y="20" width="0" height="6" fill="var(--accent)" style="animation:tdType 2.4s steps(10) infinite"/><rect x="30" y="34" width="0" height="6" fill="var(--accent)" style="animation:tdType 2.4s steps(10) infinite .25s"/><rect x="30" y="48" width="0" height="6" fill="var(--accent)" style="animation:tdType 2.4s steps(10) infinite .5s"/><path d="M175 24 l22 18 l-22 18 z" fill="var(--ok)" style="animation:tdBlink 1.8s ease-in-out infinite"/></svg>';
+const TD_RULER='<svg viewBox="0 0 240 84"><line x1="40" y1="42" x2="200" y2="42" stroke="var(--line)" stroke-width="2"/><line x1="40" y1="32" x2="40" y2="52" stroke="var(--text)" stroke-width="2"/><line x1="200" y1="32" x2="200" y2="52" stroke="var(--text)" stroke-width="2" style="animation:tdCaliper 2.4s ease-in-out infinite"/><text x="110" y="26" font-size="11" fill="var(--accent)" text-anchor="middle">12.0 cm</text></svg>';
+const TD_BOARD='<svg viewBox="0 0 240 84"><rect x="30" y="18" width="46" height="48" rx="4" fill="none" stroke="var(--text)" stroke-width="2"/><circle cx="53" cy="28" r="3" fill="var(--ok)" style="animation:tdBlink 1.2s ease-in-out infinite"/><rect x="100" y="24" width="0" height="6" fill="var(--accent)" style="animation:tdType 2.4s steps(12) infinite"/><rect x="100" y="38" width="0" height="6" fill="var(--accent)" style="animation:tdType 2.4s steps(12) infinite .3s"/><rect x="100" y="52" width="0" height="6" fill="var(--accent)" style="animation:tdType 2.4s steps(12) infinite .6s"/></svg>';
+const TD_CAMERA='<svg viewBox="0 0 240 108"><rect x="14" y="14" width="212" height="80" rx="6" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="34" cy="30" r="4" fill="var(--bad)" style="animation:tdBlink 1s ease-in-out infinite"/><text x="44" y="34" font-size="10" fill="var(--bad)" font-family="sans-serif">REC</text><circle cx="140" cy="58" r="13" fill="var(--accent2)"/><rect x="121" y="39" width="38" height="38" fill="none" stroke="var(--accent)" stroke-width="2" style="animation:tdBlink 1.4s ease-in-out infinite"/><line x1="20" y1="58" x2="112" y2="58" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 4" style="animation:tdSweep 2.2s linear infinite"/><text x="168" y="62" font-size="9" fill="var(--dim)" font-family="sans-serif">tracking\u2026</text></svg>';
+const TD_CALIB='<svg viewBox="0 0 240 108"><rect x="20" y="10" width="200" height="88" rx="4" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="36" y="18" width="168" height="52" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="260" style="animation:tdRectDraw 6s linear infinite"/><g font-family="sans-serif" font-size="9" fill="var(--accent2)"><circle cx="36" cy="18" r="5" fill="var(--accent2)" style="animation:tdCornerPop 6s linear infinite"/><text x="42" y="13" style="animation:tdCornerPop 6s linear infinite">1</text><circle cx="204" cy="18" r="5" fill="var(--accent2)" style="animation:tdCornerPop 6s linear infinite 1.2s"/><text x="210" y="13" style="animation:tdCornerPop 6s linear infinite 1.2s">2</text><circle cx="204" cy="70" r="5" fill="var(--accent2)" style="animation:tdCornerPop 6s linear infinite 2.52s"/><text x="210" y="85" style="animation:tdCornerPop 6s linear infinite 2.52s">3</text><circle cx="36" cy="70" r="5" fill="var(--accent2)" style="animation:tdCornerPop 6s linear infinite 3.84s"/><text x="16" y="85" style="animation:tdCornerPop 6s linear infinite 3.84s">4</text></g><g style="animation:tdCheck 6s linear infinite"><circle cx="196" cy="90" r="9" fill="var(--ok)"/><path d="M191 90 l4 4 l7 -8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g><path d="M0 0 L0 15 L4.3 11.3 L7.3 17.3 L10 16 L7 10 L12 10 Z" fill="#fff" stroke="#111" stroke-width="1.2" style="animation:tdCursor4 6s ease-in-out infinite"/></svg>';
+const TD_PICK='<svg viewBox="0 0 240 108"><circle cx="55" cy="68" r="9" fill="var(--accent2)" style="animation:tdObjMove 5s ease-in-out infinite"/><line x1="44" y1="50" x2="44" y2="64" stroke="var(--text)" stroke-width="3" stroke-linecap="round" style="animation:tdGripL 5s ease-in-out infinite"/><line x1="66" y1="50" x2="66" y2="64" stroke="var(--text)" stroke-width="3" stroke-linecap="round" style="animation:tdGripR 5s ease-in-out infinite"/><rect x="150" y="75" width="30" height="24" rx="2" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" style="animation:tdDropGlow 5s ease-in-out infinite"/></svg>';
+const TD_PLUG='<svg viewBox="0 0 240 84"><rect x="30" y="30" width="26" height="24" rx="3" fill="none" stroke="var(--text)" stroke-width="2"/><line x1="56" y1="42" x2="160" y2="42" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6 6" style="animation:tdSweep 1.6s linear infinite"/><rect x="160" y="22" width="44" height="40" rx="4" fill="none" stroke="var(--text)" stroke-width="2"/><path d="M172 42 l8 8 l14 -18" fill="none" stroke="var(--ok)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="animation:tdBlink 1.8s ease-in-out infinite"/></svg>';
+const TD_TABS='<svg viewBox="0 0 240 84"><rect x="20" y="36" width="44" height="18" rx="3" fill="var(--accent)" style="animation:tdTabs 3.2s steps(4) infinite"/><rect x="20" y="36" width="44" height="18" rx="3" fill="none" stroke="var(--line)" stroke-width="1"/><rect x="68" y="36" width="44" height="18" rx="3" fill="none" stroke="var(--line)" stroke-width="1"/><rect x="116" y="36" width="44" height="18" rx="3" fill="none" stroke="var(--line)" stroke-width="1"/><rect x="164" y="36" width="44" height="18" rx="3" fill="none" stroke="var(--line)" stroke-width="1"/></svg>';
+
+const TOUR_STEPS=[
+  {title:'Welcome to Armature',body:'An open-source robot arm studio \u2014 simulate, animate, wire up real hardware, and track objects with a camera. Here\u2019s a 60-second tour. Skip any time.',center:true},
+  {ws:'layout',ed:'viewport',sel:'#viewwrap',title:'3D viewport',body:'Drag to orbit the arm. Drag the orange target (or its coloured arrows) to move it with inverse kinematics, or click any joint to select it.',demo:TD_ORBIT},
+  {ws:'layout',ed:'joints',sel:'#poseList',title:'Pose a joint',body:'Drag a slider or type an exact value to pose each joint by hand.',demo:TD_SLIDER},
+  {ws:'layout',ed:'timeline',sel:'#dswrap',title:'Keyframes',body:'Press K to set a key on every joint, move the playhead, pose again, press K again. Space plays it back.',demo:TD_KEYS},
+  {ws:'scripting',ed:'script',sel:'#conRun',title:'Python script',body:'Write a script \u2014 move(), goto(), glide(), see()/pick() for the camera \u2014 and press Run. Scripts save with your project.',demo:TD_SCRIPT},
+  {ws:'layout',ed:'props',sel:'#armReach',title:'Build your arm',body:'Add joints and type their real measured length in centimetres \u2014 it feeds straight into the inverse-kinematics reach shown here.',demo:TD_RULER},
+  {ws:'hardware',ed:'fw',sel:'#fwBoard',title:'Firmware',body:'Pick your board and this writes ready-to-upload code, already wired to the motors you set up in Properties.',demo:TD_BOARD},
+  {ws:'vision',ed:'cam',sel:'#camStart',title:'Camera tracking',body:'Point a webcam at your workspace to track an object by colour, motion, or a free AI model.',demo:TD_CAMERA,big:true},
+  {ws:'vision',ed:'calib',sel:'#calCompute',title:'Calibration',body:'Turn on "Add points by clicking", click a rectangle\u2019s 4 corners in order, type its width & height in cm, then compute \u2014 that maps pixels to real arm coordinates. A crosshair now shows exactly where each click will land.',demo:TD_CALIB,big:true},
+  {ws:'vision',ed:'pick',sel:'#camAutoPick',title:'Pick & place',body:'Set a drop point, press Start, and the arm closes its gripper on whatever the camera sees, lifts it, and places it down on its own.',demo:TD_PICK,big:true},
+  {ws:'layout',ed:'ser',sel:'#serConnect',title:'Connect a real arm',body:'Connect over USB or Wi-Fi, then turn on \u201cMirror to arm\u201d in the top bar to drive it live.',demo:TD_PLUG},
+  {sel:'#wsTabs',title:'Workspaces',body:'These tabs swap the whole layout. Every panel can also be split (\u2194 \u2195), closed, or changed to a different tool from its own header dropdown.',demo:TD_TABS},
+  {title:'You\u2019re set',body:'That\u2019s everything. Reopen this tour any time from File \u2192 Take the tour, revisit one window from File \u2192 About Armature, or press the ? button for a written quick guide.',center:true}
+];
+let tourIdx=0,tourActive=false;
+const tourBack=$('#tourBack'),tourSpot=$('#tourSpot'),tourCard=$('#tourCard'),tourDemo=$('#tourDemo');
+function tourPlaceCenter(){
+  tourSpot.className='center';tourSpot.style.top='50%';tourSpot.style.left='50%';tourSpot.style.width='0px';tourSpot.style.height='0px';
+  const cw=Math.min(300,innerWidth-24),ch=160;
+  tourCard.style.left=Math.max(10,innerWidth/2-cw/2)+'px';tourCard.style.top=Math.max(10,innerHeight/2-ch/2)+'px';
+}
+function tourPlaceOn(el){
+  const r=el.getBoundingClientRect(),pad=8;
+  tourSpot.className='pulse';
+  tourSpot.style.top=(r.top-pad)+'px';tourSpot.style.left=(r.left-pad)+'px';
+  tourSpot.style.width=(r.width+pad*2)+'px';tourSpot.style.height=(r.height+pad*2)+'px';
+  const cw=Math.min(300,innerWidth-24);
+  let cx=clamp(r.left+r.width/2-cw/2,10,innerWidth-cw-10);
+  let cy=r.bottom+16;
+  if(cy+230>innerHeight-10)cy=Math.max(10,r.top-246);
+  tourCard.style.left=cx+'px';tourCard.style.top=cy+'px';
+}
+function tourPosition(){
+  const s=TOUR_STEPS[tourIdx],el=s.sel&&$(s.sel);
+  if(el)tourPlaceOn(el);else tourPlaceCenter();
+}
+async function tourShow(i){
+  tourIdx=clamp(i,0,TOUR_STEPS.length-1);
+  const s=TOUR_STEPS[tourIdx];
+  let waited=false;
+  if(s.ws&&wsName!==s.ws){switchWorkspace(s.ws);waited=true;}
+  if(s.ed){showEditor(s.ed);waited=true;}
+  if(waited)await new Promise(r=>setTimeout(r,220));
+  tourPosition();
+  if(s.demo){tourDemo.hidden=false;tourDemo.innerHTML=s.demo;tourDemo.classList.toggle('big',!!s.big);}else{tourDemo.hidden=true;tourDemo.innerHTML='';}
+  $('#tourTitle').textContent=s.title;$('#tourBody').textContent=s.body;
+  $('#tourDots').replaceChildren(...TOUR_STEPS.map((_,k)=>h('span',{class:k===tourIdx?'on':''})));
+  $('#tourBack2').disabled=tourIdx===0;
+  $('#tourNext').textContent=tourIdx===TOUR_STEPS.length-1?'Finish':'Next';
+  tourSpot.hidden=false;tourCard.hidden=false;
+  requestAnimationFrame(()=>{tourSpot.classList.add('show');tourCard.classList.add('show');});
+}
+function startTour(){
+  tourActive=true;tourBack.hidden=false;
+  requestAnimationFrame(()=>tourBack.classList.add('show'));
+  tourShow(0);
+}
+function startTourAt(i){
+  tourActive=true;tourBack.hidden=false;
+  requestAnimationFrame(()=>tourBack.classList.add('show'));
+  tourShow(i);
+}
+function endTour(){
+  if(!tourActive)return;
+  tourActive=false;
+  tourBack.classList.remove('show');tourSpot.classList.remove('show');tourCard.classList.remove('show');
+  setTimeout(()=>{tourBack.hidden=true;tourSpot.hidden=true;tourCard.hidden=true;},260);
+  store.set('armature.tourDone','1');
+}
+$('#tourNext').addEventListener('click',()=>{if(tourIdx>=TOUR_STEPS.length-1)endTour();else tourShow(tourIdx+1);});
+$('#tourBack2').addEventListener('click',()=>{if(tourIdx>0)tourShow(tourIdx-1);});
+$('#tourSkip').addEventListener('click',endTour);
+tourBack.addEventListener('click',endTour);
+window.addEventListener('keydown',e=>{
+  if(!tourActive)return;
+  if(e.key==='Escape'){endTour();}
+  else if(e.key==='ArrowRight'||e.key==='Enter'){$('#tourNext').click();}
+  else if(e.key==='ArrowLeft'){if(tourIdx>0)tourShow(tourIdx-1);}
+});
+window.addEventListener('resize',()=>{if(tourActive)tourPosition();});
+
+/* ---- About dialog: a clickable card per window, jumping into the tour at that step ---- */
+$('#aboutGrid').replaceChildren(...TOUR_STEPS.map((s,i)=>s.center?null:
+  h('button',{onclick:()=>{$('#dlgAbout').close();startTourAt(i);}},h('b',{text:s.title}),h('span',{text:s.body.slice(0,70)+(s.body.length>70?'\u2026':'')}))
+).filter(Boolean));
+
+/* ================= camera node: object tracking + pick ================= */
+const camVideo=$('#camVideo'),camView=$('#camView'),camCtx=camView.getContext('2d',{willReadFrequently:true});
+const camOverlay=$('#camOverlay');
+const procCanvas=document.createElement('canvas'),procCtx=procCanvas.getContext('2d',{willReadFrequently:true});
+const PW=160;let PH=120;
+const camState={running:false,stream:null,mode:'color',found:false,cx:.5,cy:.5,bw:0,bh:0,tRGB:null,prevGray:null,lastLiveT:0,autoPick:false,picking:false,lastPickT:0};
+let calPts=[],calH=null,awaitingCal=false;
+let pickHistory=[];
+
+/* ---- lightweight, model-free tracking: colour-distance blob or frame-difference motion ---- */
+function procFrame(){
+  procCtx.drawImage(camVideo,0,0,PW,PH);
+  let d;try{d=procCtx.getImageData(0,0,PW,PH).data;}catch(e){return;}
+  let sx=0,sy=0,cnt=0,minx=PW,maxx=0,miny=PH,maxy=0;
+  if(camState.mode==='color'&&camState.tRGB){
+    const [tr,tg,tb]=camState.tRGB,th=(+$('#camTol').value)*1.8,th2=th*th;
+    for(let y=0;y<PH;y++)for(let x=0;x<PW;x++){
+      const i=(y*PW+x)*4,dr=d[i]-tr,dg=d[i+1]-tg,db=d[i+2]-tb;
+      if(dr*dr+dg*dg+db*db<th2){sx+=x;sy+=y;cnt++;if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;}
+    }
+  }else if(camState.mode==='motion'){
+    const gray=new Float32Array(PW*PH),sensT=(+$('#camSens').value)*1.8,prev=camState.prevGray;
+    for(let y=0;y<PH;y++)for(let x=0;x<PW;x++){
+      const i=(y*PW+x)*4,idx=y*PW+x,g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+      gray[idx]=g;
+      if(prev&&Math.abs(g-prev[idx])>sensT){sx+=x;sy+=y;cnt++;if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;}
+    }
+    camState.prevGray=gray;
+  }
+  const minPix=Math.max(6,(+$('#camMin').value/100)*(PW*PH));
+  if(cnt>=minPix){
+    camState.found=true;camState.cx=sx/cnt/PW;camState.cy=sy/cnt/PH;camState.bw=(maxx-minx+1)/PW;camState.bh=(maxy-miny+1)/PH;
+  }else camState.found=false;
+}
+/* The Flip checkboxes mirror the <canvas> itself with a CSS transform (see applyCamFlip below), so the
+   video image AND everything drawn on this canvas (box, crosshair, calibration dots) flip together as
+   one picture. Detection (procFrame / the ML model) always reads the raw, unflipped video frame into an
+   offscreen canvas, so camState.cx/cy stay in that same "true" space regardless of the flip \u2014 drawing
+   them here at their true position is correct because the CSS transform flips the whole canvas for us. */
+function camDraw(){
+  const w=camView.width,h=camView.height;if(!w||!h)return;
+  camCtx.drawImage(camVideo,0,0,w,h);
+  if(camState.found){
+    const x=camState.cx*w,y=camState.cy*h,bw=Math.max(camState.bw*w,10),bh=Math.max(camState.bh*h,10);
+    camCtx.strokeStyle=cssv('--accent2')||'#d9562e';camCtx.lineWidth=2;camCtx.strokeRect(x-bw/2,y-bh/2,bw,bh);
+    camCtx.beginPath();camCtx.moveTo(x-9,y);camCtx.lineTo(x+9,y);camCtx.moveTo(x,y-9);camCtx.lineTo(x,y+9);camCtx.stroke();
+  }
+  calPts.forEach((p,i)=>{
+    camCtx.fillStyle=cssv('--accent')||'#0e8a83';camCtx.beginPath();camCtx.arc(p.px*w,p.py*h,5,0,7);camCtx.fill();
+    camCtx.fillStyle='#fff';camCtx.font='11px sans-serif';camCtx.fillText(String(i+1),p.px*w+7,p.py*h-7);
+  });
+  if(hoverPt&&awaitingCal){
+    const hx=hoverPt.nx*w,hy=hoverPt.ny*h;
+    camCtx.strokeStyle='#fff';camCtx.lineWidth=1.5;camCtx.beginPath();camCtx.arc(hx,hy,8,0,7);camCtx.stroke();
+    camCtx.beginPath();camCtx.moveTo(hx-12,hy);camCtx.lineTo(hx-4,hy);camCtx.moveTo(hx+4,hy);camCtx.lineTo(hx+12,hy);
+    camCtx.moveTo(hx,hy-12);camCtx.lineTo(hx,hy-4);camCtx.moveTo(hx,hy+4);camCtx.lineTo(hx,hy+12);camCtx.stroke();
+  }
+  let txt=camState.found?(camState.mode==='ml'?(camState.mlLabel||'object'):'object')+'  px '+(camState.cx*100).toFixed(0)+'%, '+(camState.cy*100).toFixed(0)+'%':'no object';
+  if(camState.found&&calH){const wpt=mapPixelToWorld(camState.cx,camState.cy);txt+='   →   x '+wpt.x.toFixed(1)+'  y '+wpt.y.toFixed(1)+' cm';}
+  else if(camState.found&&!calH)txt+='   (calibrate the workspace to get X/Y)';
+  camOverlay.textContent=txt;
+}
+/* ---- optional ML mode: COCO-SSD via TensorFlow.js (free, runs on-device after the first load) ---- */
+let cocoModel=null,cocoLoading=null,mlClasses=new Set(),mlBusy=false;
+function ensureCocoModel(){
+  if(cocoModel)return Promise.resolve(cocoModel);
+  if(cocoLoading)return cocoLoading;
+  if(typeof tf==='undefined'||typeof cocoSsd==='undefined'){
+    const msg='The AI model library did not load (needs internet access to cdn.jsdelivr.net). Colour and Motion modes still work fully offline.';
+    $('#camMlStatus').textContent=msg;return Promise.reject(new Error(msg));
+  }
+  $('#camMlStatus').textContent='Loading the AI model (a few MB, first time only)…';
+  cocoLoading=cocoSsd.load({base:'lite_mobilenet_v2'}).then(m=>{cocoModel=m;$('#camMlStatus').textContent='Model ready — tracking on-device.';return m;})
+    .catch(e=>{cocoLoading=null;$('#camMlStatus').textContent='Could not load the model: '+((e&&e.message)||e);throw e;});
+  return cocoLoading;
+}
+async function procFrameML(){
+  if(mlBusy)return;let model;
+  try{model=await ensureCocoModel();}catch(e){camState.found=false;return;}
+  mlBusy=true;let preds=[];
+  try{preds=await model.detect(camVideo);}catch(e){}
+  mlBusy=false;
+  let changed=false;preds.forEach(p=>{if(!mlClasses.has(p.class)){mlClasses.add(p.class);changed=true;}});
+  if(changed){
+    const sel=$('#camClassSel'),cur=sel.value;
+    sel.replaceChildren(h('option',{value:'any',text:'Any object'}),...[...mlClasses].sort().map(c=>h('option',{value:c,text:c})));
+    sel.value=(cur==='any'||mlClasses.has(cur))?cur:'any';
+  }
+  const wanted=$('#camClassSel').value;
+  const cands=preds.filter(p=>wanted==='any'||p.class===wanted).sort((a,b)=>b.score-a.score);
+  if(cands.length){
+    const p=cands[0],vw=camVideo.videoWidth||1,vh=camVideo.videoHeight||1;
+    camState.found=true;camState.mlLabel=p.class+' '+Math.round(p.score*100)+'%';
+    camState.cx=(p.bbox[0]+p.bbox[2]/2)/vw;camState.cy=(p.bbox[1]+p.bbox[3]/2)/vh;
+    camState.bw=p.bbox[2]/vw;camState.bh=p.bbox[3]/vh;
+  }else camState.found=false;
+}
+let camLastProc=0;
+function camLoop(ts){
+  if(!camState.running)return;
+  requestAnimationFrame(camLoop);
+  if(camVideo.readyState<2)return;
+  if(camState.mode==='ml'){if(ts-camLastProc>=180){camLastProc=ts;procFrameML();}}
+  else if(ts-camLastProc>=66){camLastProc=ts;procFrame();}
+  camDraw();
+  if(calH&&camState.found){
+    const c=camSee();
+    if(c){
+      target.set(c[0],c[1],c[2]);placeTarget();       // always shows the tracked object's position in the sim
+      if($('#camLive').checked&&!camState.picking&&ts-camState.lastLiveT>90){camState.lastLiveT=ts;runIK('live');}
+    }
+  }
+  if(camState.autoPick&&calH&&camState.found&&!camState.picking&&ts-camState.lastPickT>1500){
+    camState.lastPickT=ts;camPick();
+  }
+}
+const camViewWrap=$('#camViewWrap');
+/* Explicit pixel sizing (not CSS width/aspect-ratio) so the displayed box always exactly matches the
+   canvas's internal buffer ratio \u2014 otherwise width:100%+max-height can clamp height without
+   shrinking width, stretching the image and, worse, making it easy to doubt where a click lands. */
+const camMiniWrap=$('#camMiniWrap'),camMiniView=$('#camMiniView');
+function sizeCamView(){
+  const vw=camView.width||4,vh=camView.height||3;
+  /* Cap the video at ~60% of the wrapper's width so there's always room left over for the mini
+     3D view beside it, rather than only getting space by accident when the aspect ratio leaves a gap. */
+  const maxW=(camViewWrap.clientWidth||320)*0.6,maxH=Math.max(120,innerHeight*0.38);
+  let dw=maxW,dh=Math.round(dw*vh/vw);
+  if(dh>maxH){dh=maxH;dw=Math.round(dh*vw/vh);}
+  camView.style.width=dw+'px';camView.style.height=dh+'px';
+  camMiniWrap.hidden=false;
+}
+new ResizeObserver(()=>{if(camState.running)sizeCamView();}).observe(camViewWrap);
+
+/* ---- small secondary 3D view beside the camera feed, so the arm's motion is visible without
+   leaving this panel. It shares the same scene as the main viewport but has its own camera that
+   just mirrors the main camera's current angle \u2014 nothing to orbit here, it's a passive monitor. */
+let miniRenderer=null;const miniCamera=new THREE.PerspectiveCamera(42,1,0.5,3000);miniCamera.up.set(0,0,1);
+function renderMiniView(){
+  if(camMiniWrap.hidden||!camMiniWrap.clientWidth)return;
+  if(!miniRenderer){
+    try{miniRenderer=new THREE.WebGLRenderer({canvas:camMiniView,antialias:true,alpha:true});}catch(e){return;}
+    miniRenderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  }
+  const w=camMiniWrap.clientWidth,h=camMiniWrap.clientHeight;
+  if(w<4||h<4)return;
+  miniRenderer.setSize(w,h,false);
+  miniCamera.aspect=w/h;miniCamera.position.copy(camera.position);miniCamera.quaternion.copy(camera.quaternion);miniCamera.updateProjectionMatrix();
+  miniRenderer.render(scene,miniCamera);
+}
+async function startCamera(){
+  if(camState.running){stopCamera();return;}
+  const devId=$('#camDevice').value;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:devId?{deviceId:{exact:devId}}:{facingMode:'environment'},audio:false});
+    camVideo.srcObject=stream;camState.stream=stream;await camVideo.play();
+    if(camVideo.readyState<2)await new Promise(res=>{camVideo.onloadedmetadata=res;});
+    const vw=camVideo.videoWidth||640,vh=camVideo.videoHeight||480;
+    camView.width=vw;camView.height=vh;sizeCamView();
+    PH=Math.max(60,Math.round(PW*vh/vw));procCanvas.width=PW;procCanvas.height=PH;
+    camState.running=true;camState.prevGray=null;camState.found=false;
+    $('#camStart').textContent='Stop camera';$('#camStart').classList.remove('pri');$('#camStart').classList.add('sec');
+    try{
+      const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+      $('#camDevice').replaceChildren(...devs.map((d,i)=>h('option',{value:d.deviceId,selected:d.deviceId===devId,text:d.label||('Camera '+(i+1))})));
+    }catch(e){}
+    requestAnimationFrame(camLoop);
+  }catch(e){
+    toast('Could not start the camera: '+((e&&e.message)||e)+'. Check the site/browser camera permission.',true);
+  }
+}
+function stopCamera(){
+  camState.running=false;camState.found=false;
+  if(camState.stream)camState.stream.getTracks().forEach(t=>t.stop());
+  camState.stream=null;
+  $('#camStart').textContent='Start camera';$('#camStart').classList.add('pri');$('#camStart').classList.remove('sec');
+  camOverlay.textContent='';
+}
+$('#camStart').addEventListener('click',startCamera);
+$('#camMode').addEventListener('change',e=>{
+  camState.mode=e.target.value;camState.found=false;camState.prevGray=null;
+  $('#camColorRow').hidden=camState.mode!=='color';$('#camMotionRow').hidden=camState.mode!=='motion';$('#camMlRow').hidden=camState.mode!=='ml';
+  if(camState.mode==='ml')ensureCocoModel().catch(()=>{});
+});
+$('#camBg').addEventListener('click',()=>{camState.prevGray=null;toast('Background reset');});
+function applyCamFlip(){
+  const fh=$('#camFlipH').checked,fv=$('#camFlipV').checked;
+  const t=(fh?'scaleX(-1) ':'')+(fv?'scaleY(-1)':'');
+  camView.style.transform=t.trim()||'none';
+}
+$('#camFlipH').addEventListener('change',applyCamFlip);
+$('#camFlipV').addEventListener('change',applyCamFlip);
+function camClickNorm(e){
+  const r=camView.getBoundingClientRect();
+  let nx=clamp((e.clientX-r.left)/r.width,0,1),ny=clamp((e.clientY-r.top)/r.height,0,1);
+  if($('#camFlipH').checked)nx=1-nx;
+  if($('#camFlipV').checked)ny=1-ny;
+  return {nx,ny};
+}
+let hoverPt=null;
+camView.addEventListener('pointermove',e=>{
+  if(!camState.running||!awaitingCal){hoverPt=null;return;}
+  hoverPt=camClickNorm(e);
+});
+camView.addEventListener('pointerleave',()=>{hoverPt=null;});
+camView.addEventListener('click',e=>{
+  if(!camState.running){toast('Start the camera first.',true);return;}
+  const {nx,ny}=camClickNorm(e);
+  if(awaitingCal){
+    calPts.push({px:nx,py:ny,x:0,y:0});calH=null;$('#calStatus').textContent='';renderCalList();
+    if(calPts.length>=4){
+      awaitingCal=false;$('#calAddMode').checked=false;
+      toast('4 points added — type the rectangle\u2019s width & height, or each point\u2019s X/Y, then Compute.');
+    }
+    return;
+  }
+  if($('#camMode').value==='color'){
+    const x=Math.round(nx*camView.width),y=Math.round(ny*camView.height);
+    let px;try{px=camCtx.getImageData(x,y,1,1).data;}catch(err){return;}
+    camState.tRGB=[px[0],px[1],px[2]];$('#camSwatch').style.background='rgb('+px[0]+','+px[1]+','+px[2]+')';
+  }
+});
+
+/* ---- workspace calibration: 4-point homography, pixel (0..1) -> arm X/Y (cm) ---- */
+function renderCalList(){
+  const box=$('#calList');box.innerHTML='';
+  calPts.forEach((p,i)=>{
+    box.append(h('div',{class:'calrow'},
+      h('span',{class:'px',text:(i+1)+'.  '+(p.px*100).toFixed(0)+'%, '+(p.py*100).toFixed(0)+'%'}),
+      h('input',{type:'number',step:0.5,value:p.x,'aria-label':'Point '+(i+1)+' X cm',onchange:e=>{p.x=num(e.target.value);calH=null;$('#calStatus').textContent='';}}),
+      h('input',{type:'number',step:0.5,value:p.y,'aria-label':'Point '+(i+1)+' Y cm',onchange:e=>{p.y=num(e.target.value);calH=null;$('#calStatus').textContent='';}}),
+      h('button',{text:'✕','aria-label':'Remove point '+(i+1),onclick:()=>{calPts.splice(i,1);calH=null;$('#calStatus').textContent='';renderCalList();}})));
+  });
+}
+function computeHomography(pts){
+  const A=[],b=[];
+  pts.forEach(p=>{const x=p.px,y=p.py,X=+p.x,Y=+p.y;A.push([x,y,1,0,0,0,-x*X,-y*X]);b.push(X);A.push([0,0,0,x,y,1,-x*Y,-y*Y]);b.push(Y);});
+  let sol;try{sol=solveLin(A,b);}catch(e){return null;}
+  if(sol.some(v=>!Number.isFinite(v)))return null;
+  let err=0;pts.forEach(p=>{const w=sol[6]*p.px+sol[7]*p.py+1;const X=(sol[0]*p.px+sol[1]*p.py+sol[2])/w,Y=(sol[3]*p.px+sol[4]*p.py+sol[5])/w;err+=Math.hypot(X-p.x,Y-p.y);});
+  return (Number.isFinite(err)&&err<0.5)?sol:null;
+}
+function mapPixelToWorld(nx,ny){const H=calH,w=H[6]*nx+H[7]*ny+1;return {x:(H[0]*nx+H[1]*ny+H[2])/w,y:(H[3]*nx+H[4]*ny+H[5])/w};}
+$('#calAddMode').addEventListener('change',e=>{
+  if(!e.target.checked){awaitingCal=false;return;}
+  if(!camState.running){toast('Start the camera first.',true);e.target.checked=false;return;}
+  if(calPts.length>=4){toast('There are already 4 points — clear them to start over.',true);e.target.checked=false;return;}
+  awaitingCal=true;toast('Click 4 points on the video — a rectangle\u2019s corners works best.');
+});
+$('#calRectFill').addEventListener('click',()=>{
+  if(calPts.length<4){toast('Click 4 points on the video first.',true);return;}
+  const W=num($('#calRectW').value,NaN),H=num($('#calRectH').value,NaN);
+  if(!Number.isFinite(W)||!Number.isFinite(H)||W<=0||H<=0){toast('Enter the rectangle\u2019s width and height in cm first.',true);return;}
+  const corners=[[0,0],[W,0],[W,H],[0,H]];
+  calPts.forEach((p,i)=>{if(corners[i]){p.x=corners[i][0];p.y=corners[i][1];}});
+  calH=null;$('#calStatus').textContent='';renderCalList();
+  toast('X/Y filled from the rectangle \u2014 press Compute calibration.');
+});
+$('#calClear').addEventListener('click',()=>{calPts=[];calH=null;awaitingCal=false;$('#calAddMode').checked=false;$('#calStatus').textContent='';renderCalList();});
+$('#calCompute').addEventListener('click',()=>{
+  if(calPts.length<4){toast('Add 4 points first.',true);return;}
+  const xs=calPts.map(p=>+p.x||0),ys=calPts.map(p=>+p.y||0);
+  const spanX=Math.max(...xs)-Math.min(...xs),spanY=Math.max(...ys)-Math.min(...ys);
+  if(spanX<1&&spanY<1){
+    calH=null;$('#calStatus').textContent='Those points are all still the same X/Y (0,0) \u2014 type each point\u2019s real-world position in cm, or press "Fill from rectangle", before computing.';
+    toast('Enter the real-world X/Y for each point first.',true);return;
+  }
+  const H=computeHomography(calPts);
+  if(!H){calH=null;$('#calStatus').textContent='Those points are too close together or in a line — spread them out.';return;}
+  calH=H;$('#calStatus').textContent='Calibrated ✓';toast('Workspace calibrated');
+});
+$('#camLive').addEventListener('change',e=>{if(e.target.checked&&!calH){e.target.checked=false;toast('Calibrate the workspace first.',true);}});
+
+/* ---- shared glide helper + pick sequence, also used by the Python console ---- */
+async function glideTo(x,y,z,sec=1){const r=ikSolve(q,new THREE.Vector3(x,y,z),true);await glidePose(r.x,sec);return r.ok;}
+function camSee(){
+  if(!camState.running||!camState.found||!calH)return null;
+  const w=mapPixelToWorld(camState.cx,camState.cy);
+  return [+w.x.toFixed(2),+w.y.toFixed(2),num($('#camZ').value,0)];
+}
+async function camTrackFor(sec=2){
+  const tok=runToken,until=performance.now()+sec*1000;
+  while(performance.now()<until){
+    if(tok!==runToken)throw new Error('Stopped');
+    const c=camSee();if(c){target.set(c[0],c[1],c[2]);placeTarget();runIK('live');}
+    await waitMs(0.05);
+  }
+}
+function renderPickLog(){
+  const box=$('#pickLog');if(!box)return;box.innerHTML='';
+  if(!pickHistory.length){box.append(h('div',{class:'li',style:'color:var(--dim)'},'Nothing picked yet.'));return;}
+  pickHistory.slice().reverse().forEach(e=>{
+    const t=new Date(e.time).toLocaleTimeString();
+    const txt=t+' \u2014 picked at ('+e.pick[0].toFixed(1)+', '+e.pick[1].toFixed(1)+') cm'+(e.drop?' \u2192 placed at ('+e.drop[0].toFixed(1)+', '+e.drop[1].toFixed(1)+') cm':' \u2192 held (no drop point set)');
+    box.append(h('div',{class:'li'},h('span',{class:'t',text:txt})));
+  });
+}
+async function camPick(){
+  if(!calH){toast('Calibrate the workspace first (Camera → Workspace calibration).',true);return false;}
+  const c=camSee();
+  if(!c){toast('No tracked object right now.',true);return false;}
+  const [x,y,z]=c,approach=z+num($('#camApproach').value,8),gi=arm.joints.findIndex(j=>j.type==='gripper');
+  camState.picking=true;
+  try{
+    toast('Picking…');
+    const reach1=await glideTo(x,y,approach,0.8);
+    if(!reach1){
+      toast('That point is out of reach for this arm \u2014 check Pick height/Approach in Calibration, or recalibrate.',true);
+      camState.pickFails=(camState.pickFails||0)+1;
+      if(camState.autoPick&&camState.pickFails>=3){setAutoPick(false);toast('Stopped auto-pick after 3 out-of-reach attempts in a row.',true);}
+      return false;
+    }
+    camState.pickFails=0;
+    await glideTo(x,y,z,0.6);
+    if(gi>=0)await glide(gi,arm.joints[gi].max,0.4);
+    await glideTo(x,y,approach,0.6);
+    const dxv=$('#dropX').value,dyv=$('#dropY').value,dzv=$('#dropZ').value;
+    let drop=null;
+    if(dxv!==''&&dyv!==''&&dzv!==''){
+      const DX=num(dxv),DY=num(dyv),DZ=num(dzv),DA=DZ+num($('#camApproach').value,8);
+      const reach2=await glideTo(DX,DY,DA,0.8);
+      if(reach2){await glideTo(DX,DY,DZ,0.6);if(gi>=0)await glide(gi,arm.joints[gi].min,0.4);await glideTo(DX,DY,DA,0.5);drop=[DX,DY,DZ];}
+      else toast('The drop point is out of reach \u2014 holding the object instead.',true);
+    }
+    pickHistory.push({time:Date.now(),pick:[x,y,z],drop});
+    if(pickHistory.length>20)pickHistory.shift();
+    renderPickLog();
+    toast(gi>=0?'Pick complete':'Pick complete (arm has no gripper joint, so it just hovered)');
+    return true;
+  }catch(e){
+    toast(e&&e.message==='Stopped'?'Stopped':'Pick failed: '+((e&&e.message)||e),true);return false;
+  }finally{
+    camState.picking=false;camState.lastPickT=performance.now();
+  }
+}
+$('#camPick').addEventListener('click',()=>{camPick();});
+$('#camStop').addEventListener('click',()=>{stopScripts();setAutoPick(false);toast('Stopped');});
+$('#pickLogClear').addEventListener('click',()=>{pickHistory=[];renderPickLog();});
+function setAutoPick(on){
+  if(on){
+    if(!calH){toast('Calibrate the workspace first.',true);return;}
+    if(!camState.running)startCamera();
+    camState.autoPick=true;$('#camAutoPick').textContent='■ Stop auto-pick';$('#camAutoPick').classList.add('on');
+    toast('Watching \u2014 it will pick automatically as soon as it sees the tracked object.');
+  }else{
+    camState.autoPick=false;$('#camAutoPick').textContent='\u25b6 Start: auto-pick on sight';$('#camAutoPick').classList.remove('on');
+  }
+}
+$('#camAutoPick').addEventListener('click',()=>setAutoPick(!camState.autoPick));
+
+$('#expFile').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{applyProject(JSON.parse(await f.text()));toast('Project loaded');}catch(err){toast('Could not load: '+err.message,true);}
+  e.target.value='';
+});
+
+/* ================= Python-style console ================= */
+let runToken=0;const pendingWaits=new Set();
+function waitMs(ms){return new Promise((res,rej)=>{const o={};const t=setTimeout(()=>{pendingWaits.delete(o);res();},ms*1000);o.rej=()=>{clearTimeout(t);rej(new Error('Stopped'));};pendingWaits.add(o);});}
+function stopScripts(){runToken++;pendingWaits.forEach(o=>o.rej());pendingWaits.clear();}
+function pyStr(v){
+  if(v===null||v===undefined)return 'None';if(v===true)return 'True';if(v===false)return 'False';
+  if(typeof v==='number')return Number.isInteger(v)?String(v):String(+v.toFixed(4));
+  if(typeof v==='string')return v;
+  if(Array.isArray(v))return '['+v.map(pyRepr).join(', ')+']';
+  try{return JSON.stringify(v);}catch(e){return String(v);}
+}
+const pyRepr=v=>typeof v==='string'?"'"+v+"'":pyStr(v);
+function conPrint(text,cls){const o=$('#conOut');o.append(h('div',{class:cls||'',text}));while(o.children.length>500)o.firstChild.remove();o.scrollTop=o.scrollHeight;}
+function jointIndex(j){
+  if(typeof j==='number'){if(j>=1&&j<=arm.joints.length)return Math.round(j)-1;throw new Error('Joint number must be 1 to '+arm.joints.length);}
+  const k=arm.joints.findIndex(x=>x.name.toLowerCase()===String(j).toLowerCase());
+  if(k<0)throw new Error('Unknown joint "'+j+'". Joints: '+arm.joints.map((x,i)=>(i+1)+'='+x.name).join(', '));return k;
+}
+function glide(j,v,sec=1){
+  const i=jointIndex(j);return glidePose(arm.joints.map((_,k)=>k===i?v:null),sec);
+}
+function glidePose(vals,sec=1){
+  const tok=runToken,start=q.slice(),t0=performance.now();
+  return new Promise((res,rej)=>{
+    const step=()=>{
+      if(tok!==runToken){rej(new Error('Stopped'));return;}
+      const u=sec<=0?1:clamp((performance.now()-t0)/(sec*1000),0,1),e=u*u*(3-2*u);
+      arm.joints.forEach((jj,k)=>{if(vals[k]!=null)q[k]=clamp(start[k]+(vals[k]-start[k])*e,jj.min,jj.max);});
+      afterPose('console');if(u<1)requestAnimationFrame(step);else res();
+    };requestAnimationFrame(step);
+  });
+}
+function makeApi(){
+  const api={
+    print:(...a)=>conPrint(a.map(pyStr).join(' ')),
+    range:(a,b,c)=>{if(b===undefined){b=a;a=0;}c=c||1;const r=[];for(let x=a;c>0?x<b:x>b;x+=c)r.push(x);return r;},
+    enumerate:a=>a.map((v,i)=>[i,v]),len:a=>a.length,abs:Math.abs,min:Math.min,max:Math.max,sum:a=>a.reduce((x,y)=>x+y,0),
+    round:(v,n=0)=>{const f=Math.pow(10,n);return Math.round(v*f)/f;},int:v=>Math.trunc(parseFloat(v)),float:v=>parseFloat(v),str:pyStr,
+    math:{pi:Math.PI,sin:Math.sin,cos:Math.cos,tan:Math.tan,atan2:Math.atan2,sqrt:Math.sqrt,floor:Math.floor,ceil:Math.ceil,radians:v=>v*DEG,degrees:v=>v*RAD},
+    sleep:s=>waitMs(s),
+    move:(j,v)=>{setJoint(jointIndex(j),v,'console');},
+    set_pose:list=>{list.forEach((v,i)=>{if(i<arm.joints.length&&v!=null)q[i]=clamp(v,arm.joints[i].min,arm.joints[i].max);});afterPose('console');},
+    pose:()=>q.map(v=>+v.toFixed(3)),
+    home:()=>{q=arm.joints.map(j=>j.home);afterPose('console');},
+    tool:()=>{const p=posOf(fk(q).tool);return [+p.x.toFixed(3),+p.y.toFixed(3),+p.z.toFixed(3)];},
+    goto:(x,y,z)=>{target.set(x,y,z);placeTarget();return runIK('console').ok;},
+    glide,glide_pose:glidePose,
+    glide_to:glideTo,
+    see:camSee,track:camTrackFor,pick:camPick,
+    key:()=>keyAll(),play:()=>setPlaying(true),pause:()=>setPlaying(false),seek:t=>setTime(t),
+    send:s=>{if(!sendLine(String(s)))throw new Error('No board connected. Open the Serial tab first.');},
+    read:async(sec=2)=>await nextLine(sec*1000),
+    read_pose:async()=>{const v=await requestPose();return v;},
+    connected:()=>board.connected,
+    names:()=>arm.joints.map(j=>j.name),
+    help:()=>conPrint(HELP)
+  };
+  return api;
+}
+const HELP=`Joints are numbered 1..N (as in the Pose list) or given by name.
+move(joint, value)            set a joint now            glide(joint, value, seconds)
+set_pose([v1, v2, ...])       set every joint            glide_pose([...], seconds)
+goto(x, y, z)                 inverse kinematics (cm)    glide_to(x, y, z, seconds)
+pose()  tool()  names()  home()
+key()  seek(t)  play()  pause()             keyframes and timeline
+send("A 0,30,-60")  read(seconds)  read_pose()  connected()   talk to the board (protocol: A / J i v / R / ?)
+see()  track(seconds)  pick()          camera: last tracked [x,y,z] or None, follow it, run the pick sequence
+sleep(seconds)  print(...)  range  len  min  max  round  math.pi ...
+Supported syntax: for, while, if/elif/else, def, try/except, f"{x:.2f}", # comments, and/or/not, True/False/None.`;
+const ASYNC_NAMES=['sleep','glide','glide_pose','glide_to','read','read_pose','track','pick'];
+function splitQuotes(s){return s.split(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`)/);}
+function outsideQuotes(s,fn){return splitQuotes(s).map((p,i)=>i%2?p:fn(p)).join('');}
+function stripComment(l){let qc=null;for(let i=0;i<l.length;i++){const c=l[i];if(qc){if(c==='\\')i++;else if(c===qc)qc=null;}else if(c==='"'||c==="'")qc=c;else if(c==='#')return l.slice(0,i);}return l;}
+function awaitCalls(s,names){
+  if(!names.length)return s;
+  const re=new RegExp('(^|[^\\w.$])('+names.join('|')+')\\s*\\(','g');let out='',last=0,m;
+  while((m=re.exec(s))){
+    const start=m.index+m[1].length;let i=re.lastIndex,d=1,qc=null;
+    for(;i<s.length&&d;i++){const c=s[i];if(qc){if(c==='\\')i++;else if(c===qc)qc=null;}else if(c==='"'||c==="'")qc=c;else if(c==='(')d++;else if(c===')')d--;}
+    const inner=awaitCalls(s.slice(re.lastIndex,i-1),names);
+    out+=s.slice(last,start)+'(await '+m[2]+'('+inner+'))';last=i;re.lastIndex=i;
+  }
+  return out+s.slice(last);
+}
+function pyExpr(s,names){
+  s=s.replace(/\bf(["'])((?:(?!\1).)*)\1/g,(m,qc,body)=>'`'+body.replace(/`/g,'\\`').replace(/\{([^{}]+)\}/g,(m0,ex)=>{const fm=ex.match(/^(.+?):\.(\d)f$/);return fm?'${('+fm[1]+').toFixed('+fm[2]+')}':'${'+ex+'}';})+'`');
+  s=outsideQuotes(s,p=>p.replace(/\bTrue\b/g,'true').replace(/\bFalse\b/g,'false').replace(/\bNone\b/g,'null').replace(/\band\b/g,'&&').replace(/\bor\b/g,'||').replace(/\bnot\s+/g,'!').replace(/\bis\s+not\b/g,'!==').replace(/\bis\b/g,'===').replace(/\bin\b(?=\s*\[)/g,'in'));
+  return awaitCalls(s,names);
+}
+function pyToJs(src){
+  const lines=src.replace(/\t/g,'    ').split('\n'),out=[],levels=[0],declared=new Set(),fns=new Set();
+  lines.forEach(l=>{const m=l.match(/^\s*def\s+([A-Za-z_]\w*)/);if(m)fns.add(m[1]);});
+  const names=[...ASYNC_NAMES,...fns];let expect=false;
+  for(const raw of lines){
+    const line=stripComment(raw);if(!line.trim())continue;
+    const ind=line.match(/^ */)[0].length;let t=line.trim();
+    if(expect){levels.push(ind);expect=false;}
+    else while(ind<levels[levels.length-1]){levels.pop();out.push('}');}
+    if(/^(import|from)\s/.test(t)||t==='pass'){if(t==='pass')out.push(';');continue;}
+    let m;
+    if((m=t.match(/^def\s+(\w+)\s*\((.*)\)\s*:$/))){out.push('async function '+m[1]+'('+m[2]+') {');expect=true;}
+    else if((m=t.match(/^for\s+(.+?)\s+in\s+(.+):$/))){out.push('for (let '+(m[1].includes(',')?'['+m[1]+']':m[1])+' of '+pyExpr(m[2],names)+') {');expect=true;}
+    else if((m=t.match(/^while\s+(.+):$/))){out.push('while ('+pyExpr(m[1],names)+') {');expect=true;}
+    else if((m=t.match(/^if\s+(.+):$/))){out.push('if ('+pyExpr(m[1],names)+') {');expect=true;}
+    else if((m=t.match(/^elif\s+(.+):$/))){out.push('else if ('+pyExpr(m[1],names)+') {');expect=true;}
+    else if(t==='else:'){out.push('else {');expect=true;}
+    else if(t==='try:'){out.push('try {');expect=true;}
+    else if(/^except\b.*:$/.test(t)){out.push('catch (e) {');expect=true;}
+    else{
+      let pre='';const a=t.match(/^([A-Za-z_]\w*)\s*=(?!=)/);
+      if(a&&!declared.has(a[1])){declared.add(a[1]);pre='var ';}
+      out.push(pre+pyExpr(t,names)+';');
+    }
+  }
+  while(levels.length>1){levels.pop();out.push('}');}
+  return out.join('\n');
+}
+/* ---- saved scripts (replaces the old line-by-line REPL) ---- */
+const DEFAULT_SCRIPTS=[
+  {name:'Sweep joint 2',code:`# Sweep joint 2 around where it is now
+start = pose()[1]
+for i in range(3):
+    glide(2, start + 20, 0.5)
+    glide(2, start - 20, 0.5)
+glide(2, start, 0.5)`},
+  {name:'Square with IK',code:`# Move the tool tip around a square with inverse kinematics
+p = tool()
+for c in [[6, 6], [6, -6], [-6, -6], [-6, 6], [6, 6]]:
+    ok = glide_to(p[0] + c[0], p[1] + c[1], p[2], 0.8)
+    if not ok:
+        print("corner out of reach", c)`},
+  {name:'Talk to the board',code:`# Needs a connected board (or the virtual board) in the Serial tab
+send("?")
+print("board says:", read(2))
+print("arm reports:", read_pose())`},
+  {name:'Define a move',code:`def grab(x, y):
+    glide_to(x, y, 12, 0.8)
+    glide_to(x, y, 6, 0.5)
+    sleep(0.3)
+    glide_to(x, y, 12, 0.5)
+
+p = tool()
+grab(p[0], p[1] + 4)
+grab(p[0], p[1] - 4)`},
+  {name:'Track and pick',code:`# Needs a started camera, a calibrated workspace, and an object in view
+c = see()
+if c:
+    print("object at", c)
+    track(2)      # follow it with the simulated arm for 2 seconds
+    pick()        # run the pick (and place, if a drop point is set)
+else:
+    print("nothing tracked yet")`}
+];
+let scripts=DEFAULT_SCRIPTS.map(s=>({name:s.name,code:s.code})),curScript=0;
+function renderScrList(){
+  const box=$('#scrList');box.innerHTML='';
+  scripts.forEach((s,i)=>{
+    box.append(h('div',{class:'li'+(i===curScript?' sel':''),onclick:()=>selectScript(i)},h('span',{class:'t',text:s.name||'Untitled'})));
+  });
+}
+function selectScript(i){
+  if(scripts[i]===undefined)return;
+  curScript=i;const s=scripts[i];
+  $('#scrName').value=s.name;$('#scrCode').value=s.code;
+  renderScrList();
+}
+function newScript(){
+  scripts.push({name:'New script',code:'# New script\n'});curScript=scripts.length-1;selectScript(curScript);markDirty();
+  $('#scrName').focus();$('#scrName').select();
+}
+function deleteScript(){
+  if(scripts.length<=1){toast('Keep at least one script.',true);return;}
+  scripts.splice(curScript,1);curScript=clamp(curScript,0,scripts.length-1);selectScript(curScript);markDirty();
+}
+$('#scrNew').addEventListener('click',newScript);
+$('#scrDel').addEventListener('click',deleteScript);
+$('#scrName').addEventListener('input',e=>{if(scripts[curScript]){scripts[curScript].name=e.target.value;renderScrList();markDirty();}});
+$('#scrCode').addEventListener('input',e=>{if(scripts[curScript]){scripts[curScript].code=e.target.value;markDirty();}});
+$('#scrHelp').addEventListener('click',()=>conPrint(HELP,'in'));
+DEFAULT_SCRIPTS.forEach(s=>$('#conEx').append(h('option',{value:s.name,text:s.name})));
+$('#conEx').addEventListener('change',e=>{
+  const t=DEFAULT_SCRIPTS.find(s=>s.name===e.target.value);
+  if(t){scripts.push({name:t.name,code:t.code});curScript=scripts.length-1;selectScript(curScript);markDirty();}
+  e.target.value='';
+});
+async function runConsole(){
+  const src=$('#scrCode').value;if(!src.trim())return;
+  const api=makeApi(),names=Object.keys(api),args=names.map(n=>api[n]);
+  let fn=null;const one=src.trim();
+  if(!one.includes('\n')&&!/^(for|while|if|def|try|[A-Za-z_]\w*\s*=(?!=))/.test(one)){
+    try{fn=new Function(...names,'return (async()=>{ return ('+pyExpr(one,[...ASYNC_NAMES])+'); })();');}catch(e){fn=null;}
+  }
+  try{
+    if(!fn)fn=new Function(...names,'return (async()=>{\n'+pyToJs(src)+'\n})();');
+    const tok=runToken;const r=await fn(...args);
+    if(r!==undefined&&tok===runToken)conPrint(pyRepr(r));
+    if(tok===runToken)conPrint('— finished —','in');
+  }catch(e){conPrint((e&&e.message==='Stopped'?'Stopped':(e&&e.name==='SyntaxError'?'Syntax error: ':'Error: ')+(e&&e.message||e)),'err');}
+}
+$('#conRun').addEventListener('click',runConsole);
+$('#conStop').addEventListener('click',()=>{stopScripts();setPlaying(false);});
+$('#conClear').addEventListener('click',()=>{$('#conOut').innerHTML='';});
+
+/* ================= start ================= */
+(function init(){
+  $('#fwBoard').value='uno';
+  const saved=store.get('armature.project');let ok=false;
+  if(saved){try{applyProject(JSON.parse(saved));ok=true;}catch(e){ok=false;}}
+  if(!ok){$('#preset').value=presetId;loadArm(buildPreset(presetId));}
+  selectScript(clamp(curScript,0,scripts.length-1));
+  renderPickLog();
+  initLayout();buildGrid();applyCam();resize();timeCode();regenFw();placeTarget();
+  requestAnimationFrame(frame);
+  setTimeout(startTour,700);
+})();
+})();
+</script>
+</body>
+</html>
