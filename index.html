@@ -35,7 +35,8 @@
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <style>
 :root{
   --bg:#c4c4c4;--panel:#e3e3e3;--panel2:#d5d5d5;--field:#f5f5f5;--fieldh:#fff;--line:#a8a8a8;
@@ -2497,7 +2498,11 @@ $('#conClear').addEventListener('click',()=>{$('#conOut').innerHTML='';});
   renderPickLog();
   initLayout();buildGrid();applyCam();resize();timeCode();regenFw();placeTarget();
   requestAnimationFrame(frame);
-  setTimeout(startTour,700);
+  /* The tour's welcome text ends up being the page's largest contentful element (there's little else
+     with that much visible text on first paint), so how soon it appears directly sets LCP. A fixed
+     700ms delay was adding most of that time for nothing \u2014 two animation frames is enough to let the
+     initial layout settle before the overlay shows. */
+  requestAnimationFrame(()=>requestAnimationFrame(startTour));
 })();
 })();
 </script>
