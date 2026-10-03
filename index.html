@@ -1784,7 +1784,11 @@ function renderLayout(){
   Object.values(EDITORS).forEach(e=>stash.append($(e.el)));
   $('#areas').replaceChildren(buildNode(curTree()));
   $$('#wsTabs button').forEach(b=>b.classList.toggle('on',b.dataset.ws===wsName));
-  need();resize();dsResize();regenFw();saveLayout();
+  need();regenFw();saveLayout();
+  /* resize()/dsResize() read clientWidth/clientHeight, which right after the DOM rebuild above would
+     force a synchronous layout flush instead of letting the browser compute it naturally for the next
+     paint. Pushing them one frame later avoids that \u2014 a one-frame-later canvas resize is invisible. */
+  requestAnimationFrame(()=>{resize();dsResize();});
 }
 function switchWorkspace(name){
   wsName=name;if(!trees[name]||!validTree(trees[name]))trees[name]=WS_DEFAULT[name]();
@@ -2496,7 +2500,7 @@ $('#conClear').addEventListener('click',()=>{$('#conOut').innerHTML='';});
   if(!ok){$('#preset').value=presetId;loadArm(buildPreset(presetId));}
   selectScript(clamp(curScript,0,scripts.length-1));
   renderPickLog();
-  initLayout();buildGrid();applyCam();resize();timeCode();regenFw();placeTarget();
+  initLayout();buildGrid();applyCam();timeCode();regenFw();placeTarget();
   requestAnimationFrame(frame);
   /* The tour's welcome text ends up being the page's largest contentful element (there's little else
      with that much visible text on first paint), so how soon it appears directly sets LCP. A fixed
