@@ -33,6 +33,8 @@
   generate firmware for Arduino / ESP / Pico / Raspberry Pi, and export URDF + ROS 2 bridge code.
   Single self-contained file. Three.js r128 is loaded from cdnjs.
 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -538,8 +540,10 @@ kbd{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;background
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<!-- TensorFlow.js + COCO-SSD (needed only for the optional "Object detection (AI model)" camera-tracking
+     mode) are NOT loaded here. They're several hundred KB that most visitors never need, so they're
+     fetched on demand \u2014 see ensureTF()/ensureCocoModel() in the camera module \u2014 instead of blocking
+     every page load. -->
 <script>
 (()=>{
 'use strict';
@@ -1972,15 +1976,31 @@ function camDraw(){
 }
 /* ---- optional ML mode: COCO-SSD via TensorFlow.js (free, runs on-device after the first load) ---- */
 let cocoModel=null,cocoLoading=null,mlClasses=new Set(),mlBusy=false;
+function loadScriptTag(src){
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error('Could not reach '+src));
+    document.head.appendChild(s);
+  });
+}
+let tfLoading=null;
+function ensureTF(){
+  if(typeof cocoSsd!=='undefined')return Promise.resolve();
+  if(tfLoading)return tfLoading;
+  $('#camMlStatus').textContent='Loading the AI model library\u2026';
+  tfLoading=loadScriptTag('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js')
+    .then(()=>loadScriptTag('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'))
+    .catch(e=>{tfLoading=null;throw e;});
+  return tfLoading;
+}
 function ensureCocoModel(){
   if(cocoModel)return Promise.resolve(cocoModel);
   if(cocoLoading)return cocoLoading;
-  if(typeof tf==='undefined'||typeof cocoSsd==='undefined'){
-    const msg='The AI model library did not load (needs internet access to cdn.jsdelivr.net). Colour and Motion modes still work fully offline.';
-    $('#camMlStatus').textContent=msg;return Promise.reject(new Error(msg));
-  }
-  $('#camMlStatus').textContent='Loading the AI model (a few MB, first time only)…';
-  cocoLoading=cocoSsd.load({base:'lite_mobilenet_v2'}).then(m=>{cocoModel=m;$('#camMlStatus').textContent='Model ready — tracking on-device.';return m;})
+  cocoLoading=ensureTF().then(()=>{
+    if(typeof tf==='undefined'||typeof cocoSsd==='undefined')throw new Error('The AI model library did not load (needs internet access to cdn.jsdelivr.net). Colour and Motion modes still work fully offline.');
+    $('#camMlStatus').textContent='Loading the AI model (a few MB, first time only)\u2026';
+    return cocoSsd.load({base:'lite_mobilenet_v2'});
+  }).then(m=>{cocoModel=m;$('#camMlStatus').textContent='Model ready — tracking on-device.';return m;})
     .catch(e=>{cocoLoading=null;$('#camMlStatus').textContent='Could not load the model: '+((e&&e.message)||e);throw e;});
   return cocoLoading;
 }
